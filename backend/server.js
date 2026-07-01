@@ -1,4 +1,11 @@
 import express from 'express';
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
+try {
+  dns.setServers(['8.8.8.8', '8.8.4.4']);
+} catch (e) {
+  console.warn('DNS server configuration failed, using system defaults.');
+}
 import dotenv from 'dotenv';
 import cors from 'cors';
 import morgan from 'morgan';
