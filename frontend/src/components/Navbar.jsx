@@ -23,13 +23,13 @@ const Navbar = ({ setSidebarOpen }) => {
           <Menu className="h-5 w-5" />
         </button>
 
-        {user && user.businessInfo?.name && (
+        {user && user.businessInfo && (
           <div className="hidden items-center gap-2.5 sm:flex">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400">
               <Building className="h-4.5 w-4.5" />
             </div>
             <span className="text-sm font-semibold tracking-wide text-slate-100">
-              {user.businessInfo.name}
+              {user.businessInfo.name || 'Bikkina Trades'}
             </span>
           </div>
         )}
@@ -45,10 +45,10 @@ const Navbar = ({ setSidebarOpen }) => {
         {user && (
           <div className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/40 px-4 py-2">
             <div className="flex h-7.5 w-7.5 items-center justify-center rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 text-xs font-bold text-white shadow-md">
-              {user.name.charAt(0).toUpperCase()}
+              {(user.name || 'Admin').charAt(0).toUpperCase()}
             </div>
             <div className="hidden flex-col items-start leading-tight sm:flex">
-              <span className="text-xs font-bold text-white">{user.name}</span>
+              <span className="text-xs font-bold text-white">{user.name || 'Admin'}</span>
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
                 Owner
               </span>
