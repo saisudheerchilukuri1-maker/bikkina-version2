@@ -204,6 +204,67 @@ const Payments = () => {
     }).format(val || 0);
   };
 
+  const handleViewReceipt = (receiptBase64) => {
+    if (!receiptBase64) return;
+    const newTab = window.open();
+    if (newTab) {
+      newTab.document.write(`
+        <html>
+          <head>
+            <title>Receipt Preview</title>
+            <style>
+              body {
+                margin: 0;
+                background: #0b0f19;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                color: white;
+              }
+              img {
+                max-width: 90%;
+                max-height: 80%;
+                border-radius: 12px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                border: 1px solid rgba(255,255,255,0.1);
+              }
+              .container {
+                text-align: center;
+              }
+              a {
+                display: inline-block;
+                margin-top: 20px;
+                background: #6366f1;
+                color: white;
+                text-decoration: none;
+                font-size: 13px;
+                font-weight: bold;
+                padding: 10px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+                transition: background 0.2s;
+              }
+              a:hover {
+                background: #4f46e5;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <img src="${receiptBase64}" alt="Receipt Upload" />
+              <br/>
+              <a href="${receiptBase64}" download="payment_receipt">Download Image</a>
+            </div>
+          </body>
+        </html>
+      `);
+      newTab.document.close();
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Title & Actions */}
@@ -305,16 +366,15 @@ const Payments = () => {
                       </td>
                       <td className="py-4 px-6 text-center">
                         {p.receiptImage ? (
-                          <a
-                            href={p.receiptImage}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            onClick={() => handleViewReceipt(p.receiptImage)}
+                            type="button"
                             className="inline-flex rounded bg-indigo-500/10 hover:bg-indigo-500 hover:text-white px-2.5 py-1 text-xs font-semibold text-indigo-400 transition-all"
                           >
                             Show Attachment
-                          </a>
+                          </button>
                         ) : (
-                          <span className="text-slate-650">-</span>
+                          <span className="text-slate-655">-</span>
                         )}
                       </td>
                       <td className="py-4 px-6 text-center">
