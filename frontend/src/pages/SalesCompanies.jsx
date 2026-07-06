@@ -18,6 +18,7 @@ const SalesCompanies = () => {
     name: '',
     phone: '',
     address: '',
+    gstNumber: '',
     notes: '',
   });
 
@@ -62,7 +63,7 @@ const SalesCompanies = () => {
 
   const handleOpenAddModal = () => {
     setModalType('add');
-    setFormData({ name: '', phone: '', address: '', notes: '' });
+    setFormData({ name: '', phone: '', address: '', gstNumber: '', notes: '' });
     setError('');
     setShowModal(true);
   };
@@ -74,6 +75,7 @@ const SalesCompanies = () => {
       name: company.name,
       phone: company.phone,
       address: company.address,
+      gstNumber: company.gstNumber || '',
       notes: company.notes || '',
     });
     setError('');
@@ -172,7 +174,12 @@ const SalesCompanies = () => {
               <tbody className="divide-y divide-slate-800/40 text-sm">
                 {filteredCompanies.map((company) => (
                   <tr key={company._id} className="hover:bg-slate-900/20 transition-colors">
-                    <td className="py-4 px-6 font-bold text-white">{company.name}</td>
+                    <td className="py-4 px-6">
+                      <div className="font-bold text-white">{company.name}</div>
+                      {company.gstNumber && (
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-400 mt-1">GST: {company.gstNumber}</div>
+                      )}
+                    </td>
                     <td className="py-4 px-6">
                       <div className="font-medium text-slate-200">{company.phone}</div>
                       <div className="text-xs text-slate-400 mt-0.5 truncate max-w-xs">{company.address}</div>
@@ -284,6 +291,20 @@ const SalesCompanies = () => {
                   placeholder="Street name, City, State, ZIP..."
                   className="w-full rounded-xl border border-slate-800 bg-slate-900/60 py-3 px-4 text-sm text-white placeholder-slate-500 outline-none focus:border-green-500 transition-all resize-none"
                 ></textarea>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                  GST Number (Optional)
+                </label>
+                <input
+                  type="text"
+                  name="gstNumber"
+                  value={formData.gstNumber}
+                  onChange={handleInputChange}
+                  placeholder="e.g. 22AAAAA1111A1Z1"
+                  className="w-full rounded-xl border border-slate-800 bg-slate-900/60 py-3 px-4 text-sm text-white placeholder-slate-500 outline-none focus:border-green-500 transition-all"
+                />
               </div>
 
               <div>

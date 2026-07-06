@@ -20,6 +20,10 @@ const salesCompanySchema = new mongoose.Schema(
       type: String,
       required: [true, 'Address is required'],
     },
+    gstNumber: {
+      type: String,
+      default: '',
+    },
     notes: {
       type: String,
       default: '',

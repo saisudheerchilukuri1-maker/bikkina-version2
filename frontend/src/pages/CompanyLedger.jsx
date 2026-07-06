@@ -166,7 +166,7 @@ const CompanyLedger = () => {
                 <Building2 className="h-6 w-6" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white print:text-black tracking-wide">
+                <h2 className="text-xl font-bold text-white print:text-black print-company-highlight tracking-wide">
                   {company.name}
                 </h2>
                 <div className="flex items-center gap-1 text-xs text-slate-400 font-semibold uppercase tracking-wider mt-1 print:text-slate-700">

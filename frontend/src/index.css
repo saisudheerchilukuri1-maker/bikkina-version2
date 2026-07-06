@@ -36,19 +36,101 @@
 
 /* Hide print elements during interactive use, show during window.print() */
 @media print {
-  body {
+  html, body, #root, .h-screen, .overflow-hidden, .flex, .flex-col, .flex-1, main {
+    height: auto !important;
+    overflow: visible !important;
+    position: static !important;
     background: white !important;
     color: black !important;
   }
-  .no-print {
+
+  body {
+    font-size: 11pt !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Make sure main containers take full screen width */
+  #root, main, .space-y-6, .container, .w-full {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  /* Hide navigation, sidebars, interactive action buttons */
+  .no-print, nav, aside, header, footer, button, .flex-row.no-print {
     display: none !important;
   }
+
   .print-only {
     display: block !important;
   }
+
+  /* Remove glassmorphism gradients and borders for high-contrast printing */
   .glass {
     border: none !important;
     background: transparent !important;
     box-shadow: none !important;
+    padding: 0 !important;
+    margin-bottom: 20px !important;
+  }
+
+  /* Highlight company name in print */
+  .print-company-highlight {
+    font-size: 24pt !important;
+    font-weight: 800 !important;
+    color: #000 !important;
+    border-bottom: 2px solid #000 !important;
+    padding-bottom: 4px !important;
+    margin-bottom: 8px !important;
+    text-transform: uppercase !important;
+  }
+
+  /* Table print optimization */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-top: 15px !important;
+    table-layout: auto !important;
+  }
+
+  thead {
+    display: table-header-group !important; /* repeat headers on every page */
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+  }
+
+  th {
+    background-color: #f1f5f9 !important;
+    color: #000 !important;
+    border: 1px solid #000 !important;
+    font-weight: bold !important;
+    font-size: 10pt !important;
+    padding: 8px 10px !important;
+    text-align: left !important;
+  }
+
+  td {
+    color: #000 !important;
+    border: 1px solid #000 !important;
+    font-size: 9.5pt !important;
+    padding: 8px 10px !important;
+  }
+
+  /* Override text color utilities to be dark black for clarity */
+  .text-white, .text-slate-200, .text-slate-350, .text-slate-400, .text-slate-500, .text-indigo-400, .text-green-400, .text-red-400 {
+    color: #000 !important;
+  }
+
+  /* Grid layout adjustments for printing */
+  .grid {
+    display: block !important;
   }
 }

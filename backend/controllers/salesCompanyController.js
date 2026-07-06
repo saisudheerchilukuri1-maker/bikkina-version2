@@ -18,7 +18,7 @@ export const getSalesCompanies = async (req, res, next) => {
 // @route   POST /api/sales-companies
 // @access  Private
 export const createSalesCompany = async (req, res, next) => {
-  const { name, phone, address, notes } = req.body;
+  const { name, phone, address, gstNumber, notes } = req.body;
 
   try {
     const exists = await SalesCompany.findOne({ name, user: req.user._id });
@@ -32,6 +32,7 @@ export const createSalesCompany = async (req, res, next) => {
       name,
       phone,
       address,
+      gstNumber,
       notes,
     });
 
@@ -45,7 +46,7 @@ export const createSalesCompany = async (req, res, next) => {
 // @route   PUT /api/sales-companies/:id
 // @access  Private
 export const updateSalesCompany = async (req, res, next) => {
-  const { name, phone, address, notes } = req.body;
+  const { name, phone, address, gstNumber, notes } = req.body;
 
   try {
     const company = await SalesCompany.findOne({ _id: req.params.id, user: req.user._id });
@@ -54,6 +55,7 @@ export const updateSalesCompany = async (req, res, next) => {
       company.name = name || company.name;
       company.phone = phone || company.phone;
       company.address = address || company.address;
+      company.gstNumber = gstNumber ?? company.gstNumber;
       company.notes = notes ?? company.notes;
 
       const updatedCompany = await company.save();
