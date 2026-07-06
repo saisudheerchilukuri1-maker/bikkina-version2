@@ -472,7 +472,7 @@ const Payments = () => {
                     name="amount"
                     required
                     min="0.01"
-                    step="0.01"
+                    step="any"
                     value={formData.amount}
                     onChange={handleInputChange}
                     placeholder="e.g. 5000"

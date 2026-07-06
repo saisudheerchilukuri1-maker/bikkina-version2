@@ -352,7 +352,8 @@ const Purchases = () => {
                     type="number"
                     name="quantity"
                     required
-                    min="1"
+                    min="0.001"
+                    step="any"
                     value={formData.quantity}
                     onChange={handleInputChange}
                     placeholder="e.g. 100"
@@ -368,6 +369,7 @@ const Purchases = () => {
                     name="rate"
                     required
                     min="0"
+                    step="any"
                     value={formData.rate}
                     onChange={handleInputChange}
                     placeholder="e.g. 450"
