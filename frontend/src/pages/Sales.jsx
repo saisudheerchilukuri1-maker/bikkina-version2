@@ -140,19 +140,23 @@ const Sales = () => {
     e.preventDefault();
     setError('');
 
-    // Validate and check stock of all items
+    // Group requested quantities by purchaseInvoice ID to validate total requested stock
+    const requestedQuantities = {};
     for (const item of formData.items) {
       if (!item.purchaseInvoice || !item.quantity || !item.rate) {
         setError('Please fill in all item fields.');
         return;
       }
+      requestedQuantities[item.purchaseInvoice] = (requestedQuantities[item.purchaseInvoice] || 0) + Number(item.quantity);
+    }
 
-      const quantityToSell = Number(item.quantity);
+    for (const item of formData.items) {
       const selectedPurchase = purchases.find((p) => p._id === item.purchaseInvoice);
+      const totalRequested = requestedQuantities[item.purchaseInvoice];
 
       if (selectedPurchase) {
-        if (modalType === 'add' && selectedPurchase.remainingQuantity < quantityToSell) {
-          setError(`Over-selling restricted! Only ${selectedPurchase.remainingQuantity} units remain in Purchase Invoice ${selectedPurchase.invoiceNumber} for ${selectedPurchase.productName}.`);
+        if (modalType === 'add' && selectedPurchase.remainingQuantity < totalRequested) {
+          setError(`Over-selling restricted! Only ${selectedPurchase.remainingQuantity} units remain in Purchase Invoice ${selectedPurchase.invoiceNumber} for ${selectedPurchase.productName}. Total requested: ${totalRequested}.`);
           return;
         }
 
@@ -162,16 +166,19 @@ const Sales = () => {
           let originalQty = 0;
           if (originalSale) {
             if (originalSale.items && originalSale.items.length > 0) {
-              const origItem = originalSale.items.find(i => (i.purchaseInvoice?._id || i.purchaseInvoice) === item.purchaseInvoice);
-              if (origItem) originalQty = origItem.quantity;
+              originalSale.items.forEach(i => {
+                if ((i.purchaseInvoice?._id || i.purchaseInvoice) === item.purchaseInvoice) {
+                  originalQty += i.quantity;
+                }
+              });
             } else if ((originalSale.purchaseInvoice?._id || originalSale.purchaseInvoice) === item.purchaseInvoice) {
               originalQty = originalSale.quantity;
             }
           }
 
-          const extraRequired = quantityToSell - originalQty;
+          const extraRequired = totalRequested - originalQty;
           if (selectedPurchase.remainingQuantity < extraRequired) {
-            setError(`Over-selling restricted! Only ${selectedPurchase.remainingQuantity} additional units remain in Purchase Invoice for ${selectedPurchase.productName}. Max allowed quantity for this edit: ${originalQty + selectedPurchase.remainingQuantity}`);
+            setError(`Over-selling restricted! Only ${selectedPurchase.remainingQuantity} additional units remain in Purchase Invoice for ${selectedPurchase.productName}. Max allowed total quantity for this edit: ${originalQty + selectedPurchase.remainingQuantity}. Total requested: ${totalRequested}.`);
             return;
           }
         }

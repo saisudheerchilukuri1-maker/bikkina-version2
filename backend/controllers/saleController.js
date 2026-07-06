@@ -43,6 +43,15 @@ export const createSale = async (req, res, next) => {
       throw new Error('At least one sales item is required');
     }
 
+    // Group requested quantities by purchaseInvoice ID to validate total requested stock
+    const requestedQuantities = {};
+    for (const item of items) {
+      if (item.purchaseInvoice) {
+        const pinvStr = item.purchaseInvoice.toString();
+        requestedQuantities[pinvStr] = (requestedQuantities[pinvStr] || 0) + Number(item.quantity);
+      }
+    }
+
     // Verify each purchase invoice stock
     const processedItems = [];
     let totalAmount = 0;
@@ -55,9 +64,10 @@ export const createSale = async (req, res, next) => {
       }
 
       const qty = Number(item.quantity);
-      if (purchase.remainingQuantity < qty) {
+      const totalRequested = requestedQuantities[item.purchaseInvoice.toString()];
+      if (purchase.remainingQuantity < totalRequested) {
         res.status(400);
-        throw new Error(`Insufficient stock in selected Purchase Invoice (${purchase.invoiceNumber}). Available: ${purchase.remainingQuantity}, Requested: ${qty}`);
+        throw new Error(`Insufficient stock in selected Purchase Invoice (${purchase.invoiceNumber}). Available: ${purchase.remainingQuantity}, Total requested in this invoice: ${totalRequested}`);
       }
 
       const rate = Number(item.rate);
@@ -170,6 +180,15 @@ export const updateSale = async (req, res, next) => {
     let totalAmount = 0;
 
     if (items && items.length > 0) {
+      // Group requested quantities by purchaseInvoice ID to validate total requested stock
+      const requestedQuantities = {};
+      for (const item of items) {
+        if (item.purchaseInvoice) {
+          const pinvStr = item.purchaseInvoice.toString();
+          requestedQuantities[pinvStr] = (requestedQuantities[pinvStr] || 0) + Number(item.quantity);
+        }
+      }
+
       for (const item of items) {
         const purchase = await Purchase.findOne({ _id: item.purchaseInvoice, user: req.user._id });
         if (!purchase) {
@@ -180,11 +199,12 @@ export const updateSale = async (req, res, next) => {
         }
 
         const qty = Number(item.quantity);
-        if (purchase.remainingQuantity < qty) {
+        const totalRequested = requestedQuantities[item.purchaseInvoice.toString()];
+        if (purchase.remainingQuantity < totalRequested) {
           // Restore old stock before throwing
           await restoreOldStock(sale, req.user._id);
           res.status(400);
-          throw new Error(`Insufficient stock in selected Purchase Invoice (${purchase.invoiceNumber}). Available: ${purchase.remainingQuantity}, Requested: ${qty}`);
+          throw new Error(`Insufficient stock in selected Purchase Invoice (${purchase.invoiceNumber}). Available: ${purchase.remainingQuantity}, Total requested in this invoice: ${totalRequested}`);
         }
 
         const rate = Number(item.rate);
