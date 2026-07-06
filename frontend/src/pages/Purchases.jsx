@@ -466,17 +466,17 @@ const Purchases = () => {
           </div>
 
           <div className="grid grid-cols-4 gap-2 text-sm font-semibold">
-            {['7', '8', '9', '/', '4', '5', '6', '*', '1', '2', '3', '-', '0', '.', 'C', '='].map((btn) => (
+            {['C', '(', ')', '/', '7', '8', '9', '*', '4', '5', '6', '-', '1', '2', '3', '+', '0', '.', '='].map((btn) => (
               <button
                 key={btn}
                 type="button"
                 onClick={() => handleCalcClick(btn)}
                 className={`h-11 rounded-lg flex items-center justify-center transition-all ${
                   btn === '='
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-95'
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-95 col-span-2'
                     : btn === 'C'
                     ? 'bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white'
-                    : ['/', '*', '-', '+'].includes(btn)
+                    : ['/', '*', '-', '+', '(', ')'].includes(btn)
                     ? 'bg-slate-800 text-indigo-400 hover:bg-slate-750'
                     : 'bg-slate-900/60 text-slate-200 hover:bg-slate-800'
                 }`}

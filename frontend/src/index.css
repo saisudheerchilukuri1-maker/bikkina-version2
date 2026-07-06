@@ -71,13 +71,14 @@
     display: block !important;
   }
 
-  /* Remove glassmorphism gradients and borders for high-contrast printing */
+  /* Keep boxes structured and clear in print */
   .glass {
-    border: none !important;
-    background: transparent !important;
+    border: 1px solid #111111 !important;
+    background-color: #fafafa !important;
     box-shadow: none !important;
-    padding: 0 !important;
+    padding: 20px !important;
     margin-bottom: 20px !important;
+    border-radius: 12px !important;
   }
 
   /* Highlight company name in print */
@@ -131,8 +132,13 @@
 
   /* Grid layout adjustments for printing */
   .grid {
-    display: block !important;
+    display: grid !important;
+    gap: 15px !important;
   }
+  .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)) !important; }
+  .grid-cols-2, .md:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .grid-cols-4, .lg:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
 }
 
 /* Custom color for native calendar picker calendar icon */
