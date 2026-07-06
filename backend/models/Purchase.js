@@ -2,10 +2,14 @@ import mongoose from 'mongoose';
 
 const purchaseSchema = new mongoose.Schema(
   {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
     invoiceNumber: {
       type: String,
       required: [true, 'Invoice number is required'],
-      unique: true,
       trim: true,
     },
     purchaseCompany: {
@@ -82,6 +86,8 @@ purchaseSchema.pre('validate', function (next) {
   
   next();
 });
+
+purchaseSchema.index({ invoiceNumber: 1, user: 1 }, { unique: true });
 
 const Purchase = mongoose.model('Purchase', purchaseSchema);
 

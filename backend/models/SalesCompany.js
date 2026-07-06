@@ -2,10 +2,14 @@ import mongoose from 'mongoose';
 
 const salesCompanySchema = new mongoose.Schema(
   {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
     name: {
       type: String,
       required: [true, 'Company name is required'],
-      unique: true,
       trim: true,
     },
     phone: {
@@ -30,6 +34,8 @@ const salesCompanySchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+salesCompanySchema.index({ name: 1, user: 1 }, { unique: true });
 
 const SalesCompany = mongoose.model('SalesCompany', salesCompanySchema);
 

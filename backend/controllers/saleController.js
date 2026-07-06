@@ -7,9 +7,9 @@ import SalesCompany from '../models/SalesCompany.js';
 // @access  Private
 export const getSales = async (req, res, next) => {
   try {
-    const sales = await Sale.find({})
+    const sales = await Sale.find({ user: req.user._id })
       .populate('salesCompany', 'name')
-      .populate('purchaseInvoice', 'invoiceNumber remainingQuantity quantity soldQuantity')
+      .populate('items.purchaseInvoice', 'invoiceNumber remainingQuantity quantity soldQuantity')
       .sort({ date: -1 });
     res.json(sales);
   } catch (error) {
@@ -21,49 +21,71 @@ export const getSales = async (req, res, next) => {
 // @route   POST /api/sales
 // @access  Private
 export const createSale = async (req, res, next) => {
-  const { invoiceNumber, salesCompany, purchaseInvoice, productName, quantity, rate, date, notes } = req.body;
+  const { invoiceNumber, salesCompany, items, date, notes } = req.body;
 
   try {
-    // Check if invoice number is unique
-    const invoiceExists = await Sale.findOne({ invoiceNumber });
+    // Check if invoice number is unique for this user
+    const invoiceExists = await Sale.findOne({ invoiceNumber, user: req.user._id });
     if (invoiceExists) {
       res.status(400);
       throw new Error('Sales invoice number already exists');
     }
 
     // Verify company exists
-    const company = await SalesCompany.findById(salesCompany);
+    const company = await SalesCompany.findOne({ _id: salesCompany, user: req.user._id });
     if (!company) {
       res.status(404);
       throw new Error('Sales Company not found');
     }
 
-    // Verify purchase invoice exists and check stock
-    const purchase = await Purchase.findById(purchaseInvoice);
-    if (!purchase) {
-      res.status(404);
-      throw new Error('Linked Purchase Invoice not found');
-    }
-
-    if (purchase.remainingQuantity < quantity) {
+    if (!items || items.length === 0) {
       res.status(400);
-      throw new Error(`Insufficient stock in selected Purchase Invoice (${purchase.invoiceNumber}). Available: ${purchase.remainingQuantity}, Requested: ${quantity}`);
+      throw new Error('At least one sales item is required');
     }
 
-    const totalAmount = quantity * rate;
+    // Verify each purchase invoice stock
+    const processedItems = [];
+    let totalAmount = 0;
 
-    // Deduct stock from purchase invoice
-    purchase.soldQuantity += quantity;
-    purchase.remainingQuantity = purchase.quantity - purchase.soldQuantity;
-    await purchase.save();
+    for (const item of items) {
+      const purchase = await Purchase.findOne({ _id: item.purchaseInvoice, user: req.user._id });
+      if (!purchase) {
+        res.status(404);
+        throw new Error(`Stock source Purchase Invoice not found for product: ${item.productName}`);
+      }
+
+      const qty = Number(item.quantity);
+      if (purchase.remainingQuantity < qty) {
+        res.status(400);
+        throw new Error(`Insufficient stock in selected Purchase Invoice (${purchase.invoiceNumber}). Available: ${purchase.remainingQuantity}, Requested: ${qty}`);
+      }
+
+      const rate = Number(item.rate);
+      const itemTotal = qty * rate;
+      totalAmount += itemTotal;
+
+      processedItems.push({
+        purchaseInvoice: item.purchaseInvoice,
+        productName: item.productName || purchase.productName,
+        quantity: qty,
+        rate,
+        totalAmount: itemTotal,
+      });
+    }
+
+    // Deduct stock from purchases
+    for (const item of processedItems) {
+      const purchase = await Purchase.findOne({ _id: item.purchaseInvoice, user: req.user._id });
+      purchase.soldQuantity += item.quantity;
+      purchase.remainingQuantity = purchase.quantity - purchase.soldQuantity;
+      await purchase.save();
+    }
 
     const sale = new Sale({
+      user: req.user._id,
       invoiceNumber,
       salesCompany,
-      purchaseInvoice,
-      productName,
-      quantity,
-      rate,
+      items: processedItems,
       totalAmount,
       pendingAmount: totalAmount,
       date,
@@ -83,57 +105,127 @@ export const createSale = async (req, res, next) => {
   }
 };
 
+// Helper to restore old stock in case of validation failures
+const restoreOldStock = async (sale, userId) => {
+  if (sale.items && sale.items.length > 0) {
+    for (const item of sale.items) {
+      const purchase = await Purchase.findOne({ _id: item.purchaseInvoice, user: userId });
+      if (purchase) {
+        purchase.soldQuantity += item.quantity;
+        purchase.remainingQuantity = purchase.quantity - purchase.soldQuantity;
+        await purchase.save();
+      }
+    }
+  } else if (sale.purchaseInvoice && sale.quantity) {
+    const purchase = await Purchase.findOne({ _id: sale.purchaseInvoice, user: userId });
+    if (purchase) {
+      purchase.soldQuantity += sale.quantity;
+      purchase.remainingQuantity = purchase.quantity - purchase.soldQuantity;
+      await purchase.save();
+    }
+  }
+};
+
 // @desc    Update a sale
 // @route   PUT /api/sales/:id
 // @access  Private
 export const updateSale = async (req, res, next) => {
-  const { productName, quantity, rate, date, notes } = req.body;
+  const { items, date, notes } = req.body;
 
   try {
-    const sale = await Sale.findById(req.params.id);
+    const sale = await Sale.findOne({ _id: req.params.id, user: req.user._id });
     if (!sale) {
       res.status(404);
       throw new Error('Sale record not found');
     }
 
-    const company = await SalesCompany.findById(sale.salesCompany);
+    const company = await SalesCompany.findOne({ _id: sale.salesCompany, user: req.user._id });
     if (!company) {
       res.status(404);
       throw new Error('Associated Sales Company not found');
     }
 
-    const purchase = await Purchase.findById(sale.purchaseInvoice);
-    if (!purchase) {
-      res.status(404);
-      throw new Error('Linked Purchase Invoice not found');
+    // Step 1: Revert stock for the OLD items
+    if (sale.items && sale.items.length > 0) {
+      for (const item of sale.items) {
+        const purchase = await Purchase.findOne({ _id: item.purchaseInvoice, user: req.user._id });
+        if (purchase) {
+          purchase.soldQuantity -= item.quantity;
+          purchase.remainingQuantity = purchase.quantity - purchase.soldQuantity;
+          await purchase.save();
+        }
+      }
+    } else if (sale.purchaseInvoice && sale.quantity) {
+      // Legacy single item rollback
+      const purchase = await Purchase.findOne({ _id: sale.purchaseInvoice, user: req.user._id });
+      if (purchase) {
+        purchase.soldQuantity -= sale.quantity;
+        purchase.remainingQuantity = purchase.quantity - purchase.soldQuantity;
+        await purchase.save();
+      }
+    }
+
+    // Step 2: Validate stock for NEW items
+    const processedItems = [];
+    let totalAmount = 0;
+
+    if (items && items.length > 0) {
+      for (const item of items) {
+        const purchase = await Purchase.findOne({ _id: item.purchaseInvoice, user: req.user._id });
+        if (!purchase) {
+          // Restore old stock before throwing
+          await restoreOldStock(sale, req.user._id);
+          res.status(404);
+          throw new Error(`Stock source Purchase Invoice not found for product: ${item.productName}`);
+        }
+
+        const qty = Number(item.quantity);
+        if (purchase.remainingQuantity < qty) {
+          // Restore old stock before throwing
+          await restoreOldStock(sale, req.user._id);
+          res.status(400);
+          throw new Error(`Insufficient stock in selected Purchase Invoice (${purchase.invoiceNumber}). Available: ${purchase.remainingQuantity}, Requested: ${qty}`);
+        }
+
+        const rate = Number(item.rate);
+        const itemTotal = qty * rate;
+        totalAmount += itemTotal;
+
+        processedItems.push({
+          purchaseInvoice: item.purchaseInvoice,
+          productName: item.productName || purchase.productName,
+          quantity: qty,
+          rate,
+          totalAmount: itemTotal,
+        });
+      }
+
+      // Deduct new stock
+      for (const item of processedItems) {
+        const purchase = await Purchase.findOne({ _id: item.purchaseInvoice, user: req.user._id });
+        purchase.soldQuantity += item.quantity;
+        purchase.remainingQuantity = purchase.quantity - purchase.soldQuantity;
+        await purchase.save();
+      }
+
+      sale.items = processedItems;
+      // Clear legacy single fields
+      sale.purchaseInvoice = undefined;
+      sale.productName = undefined;
+      sale.quantity = undefined;
+      sale.rate = undefined;
+    } else {
+      // If items not sent, restore the old stock
+      await restoreOldStock(sale, req.user._id);
+      totalAmount = sale.totalAmount;
     }
 
     const oldTotal = sale.totalAmount;
-    const oldQty = sale.quantity;
-
-    // Calculate stock changes
-    if (quantity !== undefined && quantity !== oldQty) {
-      const qtyDelta = quantity - oldQty;
-      // Check if purchase has enough stock for the increase
-      if (purchase.remainingQuantity < qtyDelta) {
-        res.status(400);
-        throw new Error(`Insufficient stock in Purchase Invoice for this update. Available additional: ${purchase.remainingQuantity}, Requested additional: ${qtyDelta}`);
-      }
-
-      // Adjust stock in purchase
-      purchase.soldQuantity += qtyDelta;
-      purchase.remainingQuantity = purchase.quantity - purchase.soldQuantity;
-      await purchase.save();
-    }
-
-    sale.productName = productName || sale.productName;
-    sale.quantity = quantity !== undefined ? quantity : sale.quantity;
-    sale.rate = rate !== undefined ? rate : sale.rate;
     sale.date = date || sale.date;
     sale.notes = notes ?? sale.notes;
 
     // Recalculate totals
-    sale.totalAmount = sale.quantity * sale.rate;
+    sale.totalAmount = totalAmount;
     sale.pendingAmount = sale.totalAmount - sale.receivedAmount;
 
     // Update payment status
@@ -164,22 +256,33 @@ export const updateSale = async (req, res, next) => {
 // @access  Private
 export const deleteSale = async (req, res, next) => {
   try {
-    const sale = await Sale.findById(req.params.id);
+    const sale = await Sale.findOne({ _id: req.params.id, user: req.user._id });
     if (!sale) {
       res.status(404);
       throw new Error('Sale record not found');
     }
 
     // Revert stock in purchase
-    const purchase = await Purchase.findById(sale.purchaseInvoice);
-    if (purchase) {
-      purchase.soldQuantity -= sale.quantity;
-      purchase.remainingQuantity = purchase.quantity - purchase.soldQuantity;
-      await purchase.save();
+    if (sale.items && sale.items.length > 0) {
+      for (const item of sale.items) {
+        const purchase = await Purchase.findOne({ _id: item.purchaseInvoice, user: req.user._id });
+        if (purchase) {
+          purchase.soldQuantity -= item.quantity;
+          purchase.remainingQuantity = purchase.quantity - purchase.soldQuantity;
+          await purchase.save();
+        }
+      }
+    } else if (sale.purchaseInvoice && sale.quantity) {
+      const purchase = await Purchase.findOne({ _id: sale.purchaseInvoice, user: req.user._id });
+      if (purchase) {
+        purchase.soldQuantity -= sale.quantity;
+        purchase.remainingQuantity = purchase.quantity - purchase.soldQuantity;
+        await purchase.save();
+      }
     }
 
     // Revert company totals
-    const company = await SalesCompany.findById(sale.salesCompany);
+    const company = await SalesCompany.findOne({ _id: sale.salesCompany, user: req.user._id });
     if (company) {
       company.totals.salesAmount -= sale.totalAmount;
       company.totals.pendingAmount -= sale.totalAmount;

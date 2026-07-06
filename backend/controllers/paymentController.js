@@ -9,7 +9,7 @@ import Sale from '../models/Sale.js';
 // @access  Private
 export const getPayments = async (req, res, next) => {
   try {
-    const payments = await Payment.find({})
+    const payments = await Payment.find({ user: req.user._id })
       .populate('purchaseCompany', 'name')
       .populate('salesCompany', 'name')
       .populate('purchaseInvoice', 'invoiceNumber')
@@ -44,7 +44,7 @@ export const createPayment = async (req, res, next) => {
     const allocations = [];
 
     if (companyType === 'PurchaseCompany') {
-      const company = await PurchaseCompany.findById(purchaseCompany);
+      const company = await PurchaseCompany.findOne({ _id: purchaseCompany, user: req.user._id });
       if (!company) {
         res.status(404);
         throw new Error('Purchase Company not found');
@@ -52,7 +52,7 @@ export const createPayment = async (req, res, next) => {
 
       // Step 1: Allocate to specified invoice first (if any)
       if (purchaseInvoice) {
-        const invoice = await Purchase.findById(purchaseInvoice);
+        const invoice = await Purchase.findOne({ _id: purchaseInvoice, user: req.user._id });
         if (!invoice) {
           res.status(404);
           throw new Error('Purchase Invoice not found');
@@ -87,6 +87,7 @@ export const createPayment = async (req, res, next) => {
       // Step 2: FIFO Allocation of remaining amount to other pending invoices
       if (remainingToAllocate > 0) {
         const pendingInvoices = await Purchase.find({
+          user: req.user._id,
           purchaseCompany: company._id,
           paymentStatus: { $ne: 'Paid' },
           _id: { $ne: purchaseInvoice || null },
@@ -123,7 +124,7 @@ export const createPayment = async (req, res, next) => {
       await company.save();
 
     } else if (companyType === 'SalesCompany') {
-      const company = await SalesCompany.findById(salesCompany);
+      const company = await SalesCompany.findOne({ _id: salesCompany, user: req.user._id });
       if (!company) {
         res.status(404);
         throw new Error('Sales Company not found');
@@ -131,7 +132,7 @@ export const createPayment = async (req, res, next) => {
 
       // Step 1: Allocate to specified invoice first (if any)
       if (salesInvoice) {
-        const invoice = await Sale.findById(salesInvoice);
+        const invoice = await Sale.findOne({ _id: salesInvoice, user: req.user._id });
         if (!invoice) {
           res.status(404);
           throw new Error('Sales Invoice not found');
@@ -166,6 +167,7 @@ export const createPayment = async (req, res, next) => {
       // Step 2: FIFO Allocation of remaining amount to other pending invoices
       if (remainingToAllocate > 0) {
         const pendingInvoices = await Sale.find({
+          user: req.user._id,
           salesCompany: company._id,
           paymentStatus: { $ne: 'Paid' },
           _id: { $ne: salesInvoice || null },
@@ -203,6 +205,7 @@ export const createPayment = async (req, res, next) => {
     }
 
     const payment = new Payment({
+      user: req.user._id,
       companyType,
       purchaseCompany: companyType === 'PurchaseCompany' ? purchaseCompany : undefined,
       salesCompany: companyType === 'SalesCompany' ? salesCompany : undefined,
@@ -228,7 +231,7 @@ export const createPayment = async (req, res, next) => {
 // @access  Private
 export const deletePayment = async (req, res, next) => {
   try {
-    const payment = await Payment.findById(req.params.id);
+    const payment = await Payment.findOne({ _id: req.params.id, user: req.user._id });
     if (!payment) {
       res.status(404);
       throw new Error('Payment transaction not found');
@@ -237,7 +240,7 @@ export const deletePayment = async (req, res, next) => {
     // Step 1: Revert all allocations on invoices
     for (const alloc of payment.allocations) {
       if (alloc.invoiceType === 'Purchase') {
-        const invoice = await Purchase.findById(alloc.invoiceId);
+        const invoice = await Purchase.findOne({ _id: alloc.invoiceId, user: req.user._id });
         if (invoice) {
           invoice.paidAmount -= alloc.amount;
           invoice.pendingAmount = invoice.totalAmount - invoice.paidAmount;
@@ -249,7 +252,7 @@ export const deletePayment = async (req, res, next) => {
           await invoice.save();
         }
       } else if (alloc.invoiceType === 'Sale') {
-        const invoice = await Sale.findById(alloc.invoiceId);
+        const invoice = await Sale.findOne({ _id: alloc.invoiceId, user: req.user._id });
         if (invoice) {
           invoice.receivedAmount -= alloc.amount;
           invoice.pendingAmount = invoice.totalAmount - invoice.receivedAmount;
@@ -265,14 +268,14 @@ export const deletePayment = async (req, res, next) => {
 
     // Step 2: Revert company totals
     if (payment.companyType === 'PurchaseCompany') {
-      const company = await PurchaseCompany.findById(payment.purchaseCompany);
+      const company = await PurchaseCompany.findOne({ _id: payment.purchaseCompany, user: req.user._id });
       if (company) {
         company.totals.paidAmount -= payment.amount;
         company.totals.pendingAmount += payment.amount;
         await company.save();
       }
     } else if (payment.companyType === 'SalesCompany') {
-      const company = await SalesCompany.findById(payment.salesCompany);
+      const company = await SalesCompany.findOne({ _id: payment.salesCompany, user: req.user._id });
       if (company) {
         company.totals.receivedAmount -= payment.amount;
         company.totals.pendingAmount += payment.amount;

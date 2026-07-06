@@ -7,7 +7,7 @@ import Payment from '../models/Payment.js';
 // @access  Private
 export const getSalesCompanies = async (req, res, next) => {
   try {
-    const companies = await SalesCompany.find({}).sort({ name: 1 });
+    const companies = await SalesCompany.find({ user: req.user._id }).sort({ name: 1 });
     res.json(companies);
   } catch (error) {
     next(error);
@@ -21,13 +21,14 @@ export const createSalesCompany = async (req, res, next) => {
   const { name, phone, address, notes } = req.body;
 
   try {
-    const exists = await SalesCompany.findOne({ name });
+    const exists = await SalesCompany.findOne({ name, user: req.user._id });
     if (exists) {
       res.status(400);
       throw new Error('Company already exists');
     }
 
     const company = await SalesCompany.create({
+      user: req.user._id,
       name,
       phone,
       address,
@@ -47,7 +48,7 @@ export const updateSalesCompany = async (req, res, next) => {
   const { name, phone, address, notes } = req.body;
 
   try {
-    const company = await SalesCompany.findById(req.params.id);
+    const company = await SalesCompany.findOne({ _id: req.params.id, user: req.user._id });
 
     if (company) {
       company.name = name || company.name;
@@ -71,12 +72,12 @@ export const updateSalesCompany = async (req, res, next) => {
 // @access  Private
 export const deleteSalesCompany = async (req, res, next) => {
   try {
-    const company = await SalesCompany.findById(req.params.id);
+    const company = await SalesCompany.findOne({ _id: req.params.id, user: req.user._id });
 
     if (company) {
       // Check if there are linked sales or payments
-      const linkedSales = await Sale.countDocuments({ salesCompany: company._id });
-      const linkedPayments = await Payment.countDocuments({ salesCompany: company._id });
+      const linkedSales = await Sale.countDocuments({ salesCompany: company._id, user: req.user._id });
+      const linkedPayments = await Payment.countDocuments({ salesCompany: company._id, user: req.user._id });
 
       if (linkedSales > 0 || linkedPayments > 0) {
         res.status(400);
@@ -99,29 +100,32 @@ export const deleteSalesCompany = async (req, res, next) => {
 // @access  Private
 export const getSalesCompanyLedger = async (req, res, next) => {
   try {
-    const company = await SalesCompany.findById(req.params.id);
+    const company = await SalesCompany.findOne({ _id: req.params.id, user: req.user._id });
     if (!company) {
       res.status(404);
       throw new Error('Sales Company not found');
     }
 
     // Fetch all sales for this company
-    const sales = await Sale.find({ salesCompany: company._id }).sort({ date: 1 });
+    const sales = await Sale.find({ salesCompany: company._id, user: req.user._id }).sort({ date: 1 });
 
     // Fetch all payments from this company
-    const payments = await Payment.find({ salesCompany: company._id }).sort({ paymentDate: 1 });
+    const payments = await Payment.find({ salesCompany: company._id, user: req.user._id }).sort({ paymentDate: 1 });
 
     // Combine transactions
     const transactions = [];
 
     // Map sales
     sales.forEach((s) => {
+      const description = s.items && s.items.length > 0
+        ? `Sale - ${s.items.map(item => `${item.productName} (${item.quantity} x ${item.rate})`).join(', ')}`
+        : `Sale - ${s.productName} (${s.quantity} x ${s.rate})`;
       transactions.push({
         _id: s._id,
         date: s.date,
         type: 'Sale',
         invoiceNumber: s.invoiceNumber,
-        description: `Sale - ${s.productName} (${s.quantity} x ${s.rate})`,
+        description,
         debit: s.totalAmount,
         credit: 0,
         remarks: s.notes || '',

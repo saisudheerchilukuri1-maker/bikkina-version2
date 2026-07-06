@@ -7,7 +7,7 @@ import Sale from '../models/Sale.js';
 // @access  Private
 export const getPurchases = async (req, res, next) => {
   try {
-    const purchases = await Purchase.find({})
+    const purchases = await Purchase.find({ user: req.user._id })
       .populate('purchaseCompany', 'name')
       .sort({ date: -1 });
     res.json(purchases);
@@ -23,15 +23,15 @@ export const createPurchase = async (req, res, next) => {
   const { invoiceNumber, purchaseCompany, productName, quantity, rate, date, notes } = req.body;
 
   try {
-    // Check if invoice number is unique
-    const invoiceExists = await Purchase.findOne({ invoiceNumber });
+    // Check if invoice number is unique for this user
+    const invoiceExists = await Purchase.findOne({ invoiceNumber, user: req.user._id });
     if (invoiceExists) {
       res.status(400);
       throw new Error('Invoice number already exists');
     }
 
-    // Verify company exists
-    const company = await PurchaseCompany.findById(purchaseCompany);
+    // Verify company exists for this user
+    const company = await PurchaseCompany.findOne({ _id: purchaseCompany, user: req.user._id });
     if (!company) {
       res.status(404);
       throw new Error('Purchase Company not found');
@@ -40,6 +40,7 @@ export const createPurchase = async (req, res, next) => {
     const totalAmount = quantity * rate;
 
     const purchase = new Purchase({
+      user: req.user._id,
       invoiceNumber,
       purchaseCompany,
       productName,
@@ -73,13 +74,13 @@ export const updatePurchase = async (req, res, next) => {
   const { productName, quantity, rate, date, notes } = req.body;
 
   try {
-    const purchase = await Purchase.findById(req.params.id);
+    const purchase = await Purchase.findOne({ _id: req.params.id, user: req.user._id });
     if (!purchase) {
       res.status(404);
       throw new Error('Purchase not found');
     }
 
-    const company = await PurchaseCompany.findById(purchase.purchaseCompany);
+    const company = await PurchaseCompany.findOne({ _id: purchase.purchaseCompany, user: req.user._id });
     if (!company) {
       res.status(404);
       throw new Error('Associated Purchase Company not found');
@@ -136,7 +137,7 @@ export const updatePurchase = async (req, res, next) => {
 // @access  Private
 export const deletePurchase = async (req, res, next) => {
   try {
-    const purchase = await Purchase.findById(req.params.id);
+    const purchase = await Purchase.findOne({ _id: req.params.id, user: req.user._id });
     if (!purchase) {
       res.status(404);
       throw new Error('Purchase not found');
@@ -149,18 +150,15 @@ export const deletePurchase = async (req, res, next) => {
     }
 
     // Revert company totals
-    const company = await PurchaseCompany.findById(purchase.purchaseCompany);
+    const company = await PurchaseCompany.findOne({ _id: purchase.purchaseCompany, user: req.user._id });
     if (company) {
       company.totals.purchaseAmount -= purchase.totalAmount;
-      company.totals.pendingAmount -= purchase.totalAmount; // This assumes no payments were made. We should check if paidAmount > 0 and handle reverting payments first
+      company.totals.pendingAmount -= purchase.totalAmount; 
       company.totals.paidAmount -= purchase.paidAmount;
       company.totals.quantityPurchased -= purchase.quantity;
       await company.save();
     }
 
-    // Delete any payments associated directly to this invoice
-    // (though in standard flow, payments are reverted first)
-    // We will let the payment deletion handle it, but for safety, we remove the purchase document
     await purchase.deleteOne();
 
     res.json({ message: 'Purchase removed successfully' });

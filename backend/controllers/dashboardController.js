@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Purchase from '../models/Purchase.js';
 import Sale from '../models/Sale.js';
 import Expense from '../models/Expense.js';
@@ -22,36 +23,39 @@ const getTodayRange = () => {
 export const getDashboardData = async (req, res, next) => {
   try {
     const { start, end } = getTodayRange();
+    const userMatch = { user: new mongoose.Types.ObjectId(req.user._id) };
 
     // 1. Today's Purchases
     const todayPurchasesData = await Purchase.aggregate([
-      { $match: { date: { $gte: start, $lte: end } } },
+      { $match: { ...userMatch, date: { $gte: start, $lte: end } } },
       { $group: { _id: null, total: { $sum: '$totalAmount' } } },
     ]);
     const todayPurchases = todayPurchasesData[0]?.total || 0;
 
     // 2. Today's Sales
     const todaySalesData = await Sale.aggregate([
-      { $match: { date: { $gte: start, $lte: end } } },
+      { $match: { ...userMatch, date: { $gte: start, $lte: end } } },
       { $group: { _id: null, total: { $sum: '$totalAmount' } } },
     ]);
     const todaySales = todaySalesData[0]?.total || 0;
 
     // 3. Today's Expenses
     const todayExpensesData = await Expense.aggregate([
-      { $match: { date: { $gte: start, $lte: end } } },
+      { $match: { ...userMatch, date: { $gte: start, $lte: end } } },
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]);
     const todayExpenses = todayExpensesData[0]?.total || 0;
 
     // 4. Outstanding Payables (Sum of pendingAmount from all Purchase Companies)
     const payablesData = await PurchaseCompany.aggregate([
+      { $match: userMatch },
       { $group: { _id: null, total: { $sum: '$totals.pendingAmount' } } },
     ]);
     const outstandingPayables = payablesData[0]?.total || 0;
 
     // 5. Outstanding Receivables (Sum of pendingAmount from all Sales Companies)
     const receivablesData = await SalesCompany.aggregate([
+      { $match: userMatch },
       { $group: { _id: null, total: { $sum: '$totals.pendingAmount' } } },
     ]);
     const outstandingReceivables = receivablesData[0]?.total || 0;
@@ -59,21 +63,32 @@ export const getDashboardData = async (req, res, next) => {
     // 6. Total Profit Calculation
     // Total Revenue (all sales)
     const totalSalesRevenueData = await Sale.aggregate([
+      { $match: userMatch },
       { $group: { _id: null, total: { $sum: '$totalAmount' } } },
     ]);
     const totalRevenue = totalSalesRevenueData[0]?.total || 0;
 
     // Cost of Goods Sold (COGS)
-    // Formula: Sum of (Sale.quantity * Purchase.rate)
-    const salesList = await Sale.find({}).populate('purchaseInvoice', 'rate');
+    // Formula: Sum of (Sale.items.quantity * Purchase.rate)
+    const salesList = await Sale.find({ user: req.user._id })
+      .populate('items.purchaseInvoice', 'rate')
+      .populate('purchaseInvoice', 'rate');
     let totalCogs = 0;
     salesList.forEach((sale) => {
-      const purchaseRate = sale.purchaseInvoice?.rate || 0;
-      totalCogs += sale.quantity * purchaseRate;
+      if (sale.items && sale.items.length > 0) {
+        sale.items.forEach((item) => {
+          const purchaseRate = item.purchaseInvoice?.rate || 0;
+          totalCogs += item.quantity * purchaseRate;
+        });
+      } else if (sale.purchaseInvoice && sale.quantity) {
+        const purchaseRate = sale.purchaseInvoice?.rate || 0;
+        totalCogs += sale.quantity * purchaseRate;
+      }
     });
 
     // Total Expenses
     const totalExpensesData = await Expense.aggregate([
+      { $match: userMatch },
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]);
     const totalExpenses = totalExpensesData[0]?.total || 0;
@@ -81,23 +96,23 @@ export const getDashboardData = async (req, res, next) => {
     const netProfit = totalRevenue - totalCogs - totalExpenses;
 
     // 7. Recent Transactions (Limit 10, combined)
-    const purchases = await Purchase.find({})
+    const purchases = await Purchase.find({ user: req.user._id })
       .populate('purchaseCompany', 'name')
       .sort({ createdAt: -1 })
       .limit(5);
 
-    const sales = await Sale.find({})
+    const sales = await Sale.find({ user: req.user._id })
       .populate('salesCompany', 'name')
       .sort({ createdAt: -1 })
       .limit(5);
 
-    const payments = await Payment.find({})
+    const payments = await Payment.find({ user: req.user._id })
       .populate('purchaseCompany', 'name')
       .populate('salesCompany', 'name')
       .sort({ createdAt: -1 })
       .limit(5);
 
-    const expenses = await Expense.find({}).sort({ createdAt: -1 }).limit(5);
+    const expenses = await Expense.find({ user: req.user._id }).sort({ createdAt: -1 }).limit(5);
 
     const transactions = [];
 
@@ -153,11 +168,11 @@ export const getDashboardData = async (req, res, next) => {
     const recentTransactions = transactions.slice(0, 10);
 
     // 8. Top Companies
-    const topPurchaseCompanies = await PurchaseCompany.find({})
+    const topPurchaseCompanies = await PurchaseCompany.find({ user: req.user._id })
       .sort({ 'totals.purchaseAmount': -1 })
       .limit(5);
 
-    const topSalesCompanies = await SalesCompany.find({})
+    const topSalesCompanies = await SalesCompany.find({ user: req.user._id })
       .sort({ 'totals.salesAmount': -1 })
       .limit(5);
 

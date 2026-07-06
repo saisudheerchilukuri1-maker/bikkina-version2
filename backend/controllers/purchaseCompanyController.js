@@ -7,7 +7,7 @@ import Payment from '../models/Payment.js';
 // @access  Private
 export const getPurchaseCompanies = async (req, res, next) => {
   try {
-    const companies = await PurchaseCompany.find({}).sort({ name: 1 });
+    const companies = await PurchaseCompany.find({ user: req.user._id }).sort({ name: 1 });
     res.json(companies);
   } catch (error) {
     next(error);
@@ -21,13 +21,14 @@ export const createPurchaseCompany = async (req, res, next) => {
   const { name, phone, address, gstNumber, notes } = req.body;
 
   try {
-    const exists = await PurchaseCompany.findOne({ name });
+    const exists = await PurchaseCompany.findOne({ name, user: req.user._id });
     if (exists) {
       res.status(400);
       throw new Error('Company already exists');
     }
 
     const company = await PurchaseCompany.create({
+      user: req.user._id,
       name,
       phone,
       address,
@@ -48,7 +49,7 @@ export const updatePurchaseCompany = async (req, res, next) => {
   const { name, phone, address, gstNumber, notes } = req.body;
 
   try {
-    const company = await PurchaseCompany.findById(req.params.id);
+    const company = await PurchaseCompany.findOne({ _id: req.params.id, user: req.user._id });
 
     if (company) {
       company.name = name || company.name;
@@ -73,12 +74,12 @@ export const updatePurchaseCompany = async (req, res, next) => {
 // @access  Private
 export const deletePurchaseCompany = async (req, res, next) => {
   try {
-    const company = await PurchaseCompany.findById(req.params.id);
+    const company = await PurchaseCompany.findOne({ _id: req.params.id, user: req.user._id });
 
     if (company) {
       // Check if there are linked purchases or payments
-      const linkedPurchases = await Purchase.countDocuments({ purchaseCompany: company._id });
-      const linkedPayments = await Payment.countDocuments({ purchaseCompany: company._id });
+      const linkedPurchases = await Purchase.countDocuments({ purchaseCompany: company._id, user: req.user._id });
+      const linkedPayments = await Payment.countDocuments({ purchaseCompany: company._id, user: req.user._id });
 
       if (linkedPurchases > 0 || linkedPayments > 0) {
         res.status(400);
@@ -101,17 +102,17 @@ export const deletePurchaseCompany = async (req, res, next) => {
 // @access  Private
 export const getPurchaseCompanyLedger = async (req, res, next) => {
   try {
-    const company = await PurchaseCompany.findById(req.params.id);
+    const company = await PurchaseCompany.findOne({ _id: req.params.id, user: req.user._id });
     if (!company) {
       res.status(404);
       throw new Error('Purchase Company not found');
     }
 
     // Fetch all purchases for this company
-    const purchases = await Purchase.find({ purchaseCompany: company._id }).sort({ date: 1 });
+    const purchases = await Purchase.find({ purchaseCompany: company._id, user: req.user._id }).sort({ date: 1 });
 
     // Fetch all payments to this company
-    const payments = await Payment.find({ purchaseCompany: company._id }).sort({ paymentDate: 1 });
+    const payments = await Payment.find({ purchaseCompany: company._id, user: req.user._id }).sort({ paymentDate: 1 });
 
     // Combine transactions
     const transactions = [];

@@ -11,7 +11,7 @@ export const getReportData = async (req, res, next) => {
   const { type, companyId, startDate, endDate, invoiceNumber } = req.query;
 
   try {
-    let query = {};
+    let query = { user: req.user._id };
 
     // Apply date range filter if provided
     if (startDate || endDate) {
@@ -47,12 +47,13 @@ export const getReportData = async (req, res, next) => {
         }
         reportData = await Sale.find(query)
           .populate('salesCompany', 'name')
+          .populate('items.purchaseInvoice', 'invoiceNumber')
+          .populate('purchaseInvoice', 'invoiceNumber')
           .sort({ date: -1 });
         break;
 
       case 'expenses':
-        // For expenses, we look for query.date since there's no invoice or company typically
-        const expenseQuery = {};
+        const expenseQuery = { user: req.user._id };
         if (startDate || endDate) {
           expenseQuery.date = {};
           if (startDate) expenseQuery.date.$gte = new Date(startDate);
@@ -66,23 +67,27 @@ export const getReportData = async (req, res, next) => {
         break;
 
       case 'purchase-companies':
-        // Fetch purchase companies. If companyId is specified, fetch that specific company
-        const pCompQuery = companyId ? { _id: companyId } : {};
+        const pCompQuery = { user: req.user._id };
+        if (companyId) {
+          pCompQuery._id = companyId;
+        }
         reportData = await PurchaseCompany.find(pCompQuery).sort({ name: 1 });
         break;
 
       case 'sales-companies':
-        const sCompQuery = companyId ? { _id: companyId } : {};
+        const sCompQuery = { user: req.user._id };
+        if (companyId) {
+          sCompQuery._id = companyId;
+        }
         reportData = await SalesCompany.find(sCompQuery).sort({ name: 1 });
         break;
 
       case 'outstandings':
-        // Combine outstanding amounts from both purchase and sales companies
-        const purchasesOut = await PurchaseCompany.find({ 'totals.pendingAmount': { $gt: 0 } })
+        const purchasesOut = await PurchaseCompany.find({ user: req.user._id, 'totals.pendingAmount': { $gt: 0 } })
           .select('name totals phone')
           .sort({ 'totals.pendingAmount': -1 });
 
-        const salesOut = await SalesCompany.find({ 'totals.pendingAmount': { $gt: 0 } })
+        const salesOut = await SalesCompany.find({ user: req.user._id, 'totals.pendingAmount': { $gt: 0 } })
           .select('name totals phone')
           .sort({ 'totals.pendingAmount': -1 });
 
@@ -107,10 +112,12 @@ export const getReportData = async (req, res, next) => {
       case 'profits':
         // Detailed profit report by date range
         // Revenue (Sales)
-        const salesRevenue = await Sale.find(query).populate('purchaseInvoice', 'rate');
+        const salesRevenue = await Sale.find(query)
+          .populate('items.purchaseInvoice', 'rate')
+          .populate('purchaseInvoice', 'rate');
         
         // Sum expenses in date range
-        const expQuery = {};
+        const expQuery = { user: req.user._id };
         if (startDate || endDate) {
           expQuery.date = {};
           if (startDate) expQuery.date.$gte = new Date(startDate);
@@ -126,8 +133,15 @@ export const getReportData = async (req, res, next) => {
         let totalCOGS = 0;
         salesRevenue.forEach((sale) => {
           totalRevenue += sale.totalAmount;
-          const purchaseRate = sale.purchaseInvoice?.rate || 0;
-          totalCOGS += sale.quantity * purchaseRate;
+          if (sale.items && sale.items.length > 0) {
+            sale.items.forEach((item) => {
+              const purchaseRate = item.purchaseInvoice?.rate || 0;
+              totalCOGS += item.quantity * purchaseRate;
+            });
+          } else if (sale.purchaseInvoice && sale.quantity) {
+            const purchaseRate = sale.purchaseInvoice?.rate || 0;
+            totalCOGS += sale.quantity * purchaseRate;
+          }
         });
 
         const totalExpenses = expensesList.reduce((acc, exp) => acc + exp.amount, 0);

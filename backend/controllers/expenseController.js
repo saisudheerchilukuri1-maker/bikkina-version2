@@ -5,7 +5,7 @@ import Expense from '../models/Expense.js';
 // @access  Private
 export const getExpenses = async (req, res, next) => {
   try {
-    const expenses = await Expense.find({}).sort({ date: -1 });
+    const expenses = await Expense.find({ user: req.user._id }).sort({ date: -1 });
     res.json(expenses);
   } catch (error) {
     next(error);
@@ -20,6 +20,7 @@ export const createExpense = async (req, res, next) => {
 
   try {
     const expense = await Expense.create({
+      user: req.user._id,
       title,
       amount: Number(amount),
       category,
@@ -38,7 +39,7 @@ export const createExpense = async (req, res, next) => {
 // @access  Private
 export const deleteExpense = async (req, res, next) => {
   try {
-    const expense = await Expense.findById(req.params.id);
+    const expense = await Expense.findOne({ _id: req.params.id, user: req.user._id });
 
     if (expense) {
       await expense.deleteOne();

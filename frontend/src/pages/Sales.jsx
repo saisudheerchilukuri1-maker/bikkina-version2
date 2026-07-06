@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
-import { Search, Plus, Edit, Trash2, X, Calendar, AlertCircle } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, X, Calendar, AlertCircle, Building, Archive } from 'lucide-react';
 
 const Sales = () => {
   const [sales, setSales] = useState([]);
@@ -19,10 +19,7 @@ const Sales = () => {
   const [formData, setFormData] = useState({
     invoiceNumber: '',
     salesCompany: '',
-    purchaseInvoice: '', // Links to Purchase Invoice ObjectId
-    productName: '',
-    quantity: '',
-    rate: '',
+    items: [{ purchaseInvoice: '', productName: '', quantity: '', rate: '' }],
     date: new Date().toISOString().split('T')[0],
     notes: '',
   });
@@ -37,7 +34,6 @@ const Sales = () => {
       const resCustomers = await api.get('/api/sales-companies');
       setCustomers(resCustomers.data);
 
-      // Fetch purchases where remaining quantity is greater than 0
       const resPurchases = await api.get('/api/purchases');
       setPurchases(resPurchases.data);
     } catch (err) {
@@ -54,25 +50,48 @@ const Sales = () => {
     const results = sales.filter(
       (s) =>
         s.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (s.salesCompany?.name && s.salesCompany.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        (s.salesCompany?.name && s.salesCompany.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (s.items && s.items.some(item => item.productName.toLowerCase().includes(searchTerm.toLowerCase()))) ||
+        (s.productName && s.productName.toLowerCase().includes(searchTerm.toLowerCase()))
     );
     setFilteredSales(results);
   }, [searchTerm, sales]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => {
-      const updated = { ...prev, [name]: value };
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
-      // If user selects a purchase invoice in form, auto-fill product name
+  const handleItemChange = (index, e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => {
+      const updatedItems = [...prev.items];
+      updatedItems[index] = { ...updatedItems[index], [name]: value };
+
       if (name === 'purchaseInvoice' && value) {
         const linkedPurchase = purchases.find((p) => p._id === value);
         if (linkedPurchase) {
-          updated.productName = linkedPurchase.productName;
+          updatedItems[index].productName = linkedPurchase.productName;
         }
       }
-      return updated;
+      return { ...prev, items: updatedItems };
+    });
+  };
+
+  const addItemRow = () => {
+    setFormData((prev) => ({
+      ...prev,
+      items: [...prev.items, { purchaseInvoice: '', productName: '', quantity: '', rate: '' }],
+    }));
+  };
+
+  const removeItemRow = (index) => {
+    setFormData((prev) => {
+      const updatedItems = prev.items.filter((_, idx) => idx !== index);
+      return {
+        ...prev,
+        items: updatedItems.length > 0 ? updatedItems : [{ purchaseInvoice: '', productName: '', quantity: '', rate: '' }],
+      };
     });
   };
 
@@ -81,10 +100,7 @@ const Sales = () => {
     setFormData({
       invoiceNumber: '',
       salesCompany: '',
-      purchaseInvoice: '',
-      productName: '',
-      quantity: '',
-      rate: '',
+      items: [{ purchaseInvoice: '', productName: '', quantity: '', rate: '' }],
       date: new Date().toISOString().split('T')[0],
       notes: '',
     });
@@ -98,10 +114,21 @@ const Sales = () => {
     setFormData({
       invoiceNumber: s.invoiceNumber,
       salesCompany: s.salesCompany?._id || '',
-      purchaseInvoice: s.purchaseInvoice?._id || '',
-      productName: s.productName,
-      quantity: s.quantity,
-      rate: s.rate,
+      items: s.items && s.items.length > 0
+        ? s.items.map((item) => ({
+            purchaseInvoice: item.purchaseInvoice?._id || item.purchaseInvoice || '',
+            productName: item.productName,
+            quantity: item.quantity,
+            rate: item.rate,
+          }))
+        : [
+            {
+              purchaseInvoice: s.purchaseInvoice?._id || s.purchaseInvoice || '',
+              productName: s.productName || '',
+              quantity: s.quantity || '',
+              rate: s.rate || '',
+            },
+          ],
       date: s.date ? new Date(s.date).toISOString().split('T')[0] : '',
       notes: s.notes || '',
     });
@@ -113,30 +140,51 @@ const Sales = () => {
     e.preventDefault();
     setError('');
 
-    const quantityToSell = Number(formData.quantity);
-    const selectedPurchase = purchases.find((p) => p._id === formData.purchaseInvoice);
-
-    if (modalType === 'add' && selectedPurchase && selectedPurchase.remainingQuantity < quantityToSell) {
-      setError(`Over-selling restricted! Only ${selectedPurchase.remainingQuantity} units remain in Purchase Invoice ${selectedPurchase.invoiceNumber}.`);
-      return;
-    }
-
-    if (modalType === 'edit' && selectedPurchase) {
-      // Find the original sale quantity to compute difference correctly
-      const originalSale = sales.find((s) => s._id === selectedSaleId);
-      const originalQty = originalSale ? originalSale.quantity : 0;
-      const extraRequired = quantityToSell - originalQty;
-
-      if (selectedPurchase.remainingQuantity < extraRequired) {
-        setError(`Over-selling restricted! Only ${selectedPurchase.remainingQuantity} additional units remain in Purchase Invoice. Max allowed quantity for this edit: ${originalQty + selectedPurchase.remainingQuantity}`);
+    // Validate and check stock of all items
+    for (const item of formData.items) {
+      if (!item.purchaseInvoice || !item.quantity || !item.rate) {
+        setError('Please fill in all item fields.');
         return;
+      }
+
+      const quantityToSell = Number(item.quantity);
+      const selectedPurchase = purchases.find((p) => p._id === item.purchaseInvoice);
+
+      if (selectedPurchase) {
+        if (modalType === 'add' && selectedPurchase.remainingQuantity < quantityToSell) {
+          setError(`Over-selling restricted! Only ${selectedPurchase.remainingQuantity} units remain in Purchase Invoice ${selectedPurchase.invoiceNumber} for ${selectedPurchase.productName}.`);
+          return;
+        }
+
+        if (modalType === 'edit') {
+          // Find original quantity of this purchaseInvoice in this sale (if any)
+          const originalSale = sales.find((s) => s._id === selectedSaleId);
+          let originalQty = 0;
+          if (originalSale) {
+            if (originalSale.items && originalSale.items.length > 0) {
+              const origItem = originalSale.items.find(i => (i.purchaseInvoice?._id || i.purchaseInvoice) === item.purchaseInvoice);
+              if (origItem) originalQty = origItem.quantity;
+            } else if ((originalSale.purchaseInvoice?._id || originalSale.purchaseInvoice) === item.purchaseInvoice) {
+              originalQty = originalSale.quantity;
+            }
+          }
+
+          const extraRequired = quantityToSell - originalQty;
+          if (selectedPurchase.remainingQuantity < extraRequired) {
+            setError(`Over-selling restricted! Only ${selectedPurchase.remainingQuantity} additional units remain in Purchase Invoice for ${selectedPurchase.productName}. Max allowed quantity for this edit: ${originalQty + selectedPurchase.remainingQuantity}`);
+            return;
+          }
+        }
       }
     }
 
     const submitData = {
       ...formData,
-      quantity: quantityToSell,
-      rate: Number(formData.rate),
+      items: formData.items.map((item) => ({
+        ...item,
+        quantity: Number(item.quantity),
+        rate: Number(item.rate),
+      })),
     };
 
     try {
@@ -167,14 +215,14 @@ const Sales = () => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
-      maximumFractionDigits: 0,
+      maximumFractionDigits: 2,
     }).format(val || 0);
   };
 
-  const calculatedTotal = (Number(formData.quantity) || 0) * (Number(formData.rate) || 0);
-  
-  // Find current selected purchase invoice for live stock checks in form
-  const selectedPurchaseObj = purchases.find((p) => p._id === formData.purchaseInvoice);
+  const calculatedTotal = formData.items.reduce(
+    (acc, item) => acc + (Number(item.quantity) * Number(item.rate) || 0),
+    0
+  );
 
   return (
     <div className="space-y-6">
@@ -243,17 +291,36 @@ const Sales = () => {
                     <td className="py-4 px-6 font-semibold text-slate-200">
                       {s.salesCompany?.name || 'Unknown Customer'}
                     </td>
-                    <td className="py-4 px-6">
-                      <div className="font-semibold text-slate-200">{s.productName}</div>
-                      <div className="text-xs text-slate-400 mt-1">
-                        Qty Sold: <span className="font-bold text-green-400">{s.quantity}</span>
-                        <span className="text-slate-500 mx-1.5">|</span>
-                        <span>Pur Invoice: {s.purchaseInvoice?.invoiceNumber || '-'}</span>
-                      </div>
+                    <td className="py-4 px-6 space-y-2.5">
+                      {s.items && s.items.length > 0 ? (
+                        s.items.map((item, idx) => (
+                          <div key={idx} className="border-b border-slate-800/40 pb-2 last:border-0 last:pb-0">
+                            <div className="font-semibold text-slate-200">{item.productName}</div>
+                            <div className="text-xs text-slate-400 mt-0.5">
+                              Qty Sold: <span className="font-bold text-green-400">{item.quantity}</span>
+                              <span className="text-slate-500 mx-1.5">|</span>
+                              <span>Pur Invoice: {item.purchaseInvoice?.invoiceNumber || '-'}</span>
+                              <span className="text-slate-500 mx-1.5">|</span>
+                              <span>Rate: {formatCurrency(item.rate)}</span>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div>
+                          <div className="font-semibold text-slate-200">{s.productName}</div>
+                          <div className="text-xs text-slate-400 mt-1">
+                            Qty Sold: <span className="font-bold text-green-400">{s.quantity}</span>
+                            <span className="text-slate-500 mx-1.5">|</span>
+                            <span>Pur Invoice: {s.purchaseInvoice?.invoiceNumber || '-'}</span>
+                          </div>
+                        </div>
+                      )}
                     </td>
                     <td className="py-4 px-6 text-right">
                       <div className="font-bold text-white">{formatCurrency(s.totalAmount)}</div>
-                      <div className="text-[10px] text-slate-400 font-medium mt-0.5">Rate: {formatCurrency(s.rate)}</div>
+                      <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+                        {s.items && s.items.length > 0 ? `${s.items.length} item(s)` : `Rate: ${formatCurrency(s.rate)}`}
+                      </div>
                     </td>
                     <td className="py-4 px-6 text-center">
                       <span
@@ -294,22 +361,22 @@ const Sales = () => {
 
       {/* Form Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-lg glass rounded-3xl p-6 relative shadow-2xl border border-slate-800 animate-scale-up">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+          <div className="w-full max-w-lg glass rounded-3xl p-6 relative shadow-2xl border border-slate-800 my-8">
             <button
               onClick={() => setShowModal(false)}
-              className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition-all"
+              className="absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-slate-400 hover:text-white transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
 
             <h2 className="text-xl font-bold text-white tracking-wide mb-6">
-              {modalType === 'add' ? 'Log Sales Invoice' : 'Update Sales Details'}
+              {modalType === 'add' ? 'Log Sales Invoice' : 'Edit Sales Invoice'}
             </h2>
 
             {error && (
-              <div className="mb-4 flex items-center gap-2 rounded-xl bg-red-500/10 border border-red-500/20 p-4 text-xs font-semibold text-red-400">
-                <AlertCircle className="h-4 w-4 shrink-0" />
+              <div className="mb-4 rounded-xl bg-red-500/10 border border-red-500/20 p-4 text-xs font-semibold text-red-400 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-400 mt-0.5" />
                 <span>{error}</span>
               </div>
             )}
@@ -367,73 +434,103 @@ const Sales = () => {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                  Link to Purchase stock (MANDATORY) <span className="text-red-500">*</span>
-                </label>
-                <select
-                  name="purchaseInvoice"
-                  required
-                  disabled={modalType === 'edit'}
-                  value={formData.purchaseInvoice}
-                  onChange={handleInputChange}
-                  className="w-full rounded-xl border border-slate-800 bg-slate-900/60 py-3 px-4 text-sm text-white outline-none focus:border-green-500 transition-all"
-                >
-                  <option value="">Select Stock Source Invoice</option>
-                  {purchases
-                    .filter((p) => p.remainingQuantity > 0 || (modalType === 'edit' && p._id === formData.purchaseInvoice))
-                    .map((p) => (
-                      <option key={p._id} value={p._id}>
-                        {p.invoiceNumber} - {p.productName} ({p.remainingQuantity} units left)
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-              {selectedPurchaseObj && (
-                <div className="rounded-xl bg-indigo-500/5 p-4 border border-indigo-500/10 text-xs text-indigo-300 space-y-1">
-                  <div className="font-semibold uppercase tracking-wider text-[10px]">Stock Ledger Verification:</div>
-                  <div className="flex justify-between">
-                    <span>Original Purchased Quantity:</span>
-                    <span className="font-bold text-white">{selectedPurchaseObj.quantity}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Available Remaining Stock:</span>
-                    <span className="font-extrabold text-green-400">{selectedPurchaseObj.remainingQuantity}</span>
-                  </div>
+              {/* Dynamic Items Table */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                  <span className="text-sm font-bold text-slate-300 uppercase tracking-wider">Invoice Items</span>
+                  {modalType === 'add' && (
+                    <button
+                      type="button"
+                      onClick={addItemRow}
+                      className="flex items-center gap-1.5 rounded-lg bg-indigo-500/10 px-3 py-1.5 text-xs font-semibold text-indigo-400 hover:bg-indigo-500 hover:text-white transition-all"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Product
+                    </button>
+                  )}
                 </div>
-              )}
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                    Quantity to Sell <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="quantity"
-                    required
-                    min="1"
-                    value={formData.quantity}
-                    onChange={handleInputChange}
-                    placeholder="e.g. 30"
-                    className="w-full rounded-xl border border-slate-800 bg-slate-900/60 py-3 px-4 text-sm text-white placeholder-slate-500 outline-none focus:border-green-500 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">
-                    Selling Rate per Unit (₹) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    name="rate"
-                    required
-                    min="0"
-                    value={formData.rate}
-                    onChange={handleInputChange}
-                    placeholder="e.g. 600"
-                    className="w-full rounded-xl border border-slate-800 bg-slate-900/60 py-3 px-4 text-sm text-white placeholder-slate-500 outline-none focus:border-green-500 transition-all"
-                  />
+                <div className="space-y-4 max-h-60 overflow-y-auto pr-1">
+                  {formData.items.map((item, idx) => (
+                    <div key={idx} className="relative rounded-2xl border border-slate-800 bg-slate-950/20 p-4 space-y-3">
+                      {formData.items.length > 1 && modalType === 'add' && (
+                        <button
+                          type="button"
+                          onClick={() => removeItemRow(idx)}
+                          className="absolute top-3 right-3 text-slate-500 hover:text-red-400 transition-colors"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                          Stock Source Purchase Invoice <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          name="purchaseInvoice"
+                          required
+                          disabled={modalType === 'edit'}
+                          value={item.purchaseInvoice}
+                          onChange={(e) => handleItemChange(idx, e)}
+                          className="w-full rounded-xl border border-slate-800 bg-slate-900/60 py-2 px-3 text-xs text-white outline-none focus:border-green-500 transition-all"
+                        >
+                          <option value="">Select Stock Source</option>
+                          {purchases
+                            .filter((p) => p.remainingQuantity > 0 || item.purchaseInvoice === p._id)
+                            .map((p) => (
+                              <option key={p._id} value={p._id}>
+                                {p.invoiceNumber} - {p.productName} ({p.remainingQuantity} units left)
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+
+                      {item.purchaseInvoice && (
+                        <div className="flex justify-between items-center text-[10px] text-indigo-300">
+                          <span>Product: <strong>{item.productName}</strong></span>
+                          {purchases.find(p => p._id === item.purchaseInvoice) && (
+                            <span>Rem Stock: <strong>{purchases.find(p => p._id === item.purchaseInvoice).remainingQuantity} units</strong></span>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="grid gap-3 grid-cols-2">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                            Qty to Sell <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            name="quantity"
+                            required
+                            min="0.001"
+                            step="any"
+                            value={item.quantity}
+                            onChange={(e) => handleItemChange(idx, e)}
+                            placeholder="e.g. 50.25"
+                            className="w-full rounded-xl border border-slate-800 bg-slate-900/60 py-2 px-3 text-xs text-white placeholder-slate-500 outline-none focus:border-green-500 transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                            Selling Rate per Unit (₹) <span className="text-red-500">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            name="rate"
+                            required
+                            min="0"
+                            step="any"
+                            value={item.rate}
+                            onChange={(e) => handleItemChange(idx, e)}
+                            placeholder="e.g. 450.50"
+                            className="w-full rounded-xl border border-slate-800 bg-slate-900/60 py-2 px-3 text-xs text-white placeholder-slate-500 outline-none focus:border-green-500 transition-all"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
