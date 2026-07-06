@@ -321,7 +321,7 @@ const Sales = () => {
                     <td className="py-4 px-6">
                       <div className="font-bold text-white">{s.invoiceNumber}</div>
                       <div className="flex items-center gap-1 text-xs text-slate-400 mt-1">
-                        <Calendar className="h-3.5 w-3.5 text-green-400" />
+                        <Calendar className="h-3.5 w-3.5 text-amber-400" />
                         <span>{new Date(s.date).toLocaleDateString('en-IN')}</span>
                       </div>
                     </td>
@@ -574,7 +574,7 @@ const Sales = () => {
               {/* Total calculations */}
               <div className="flex items-center justify-between rounded-xl bg-slate-950/40 p-4 border border-slate-800/40">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Gross Sales Value</span>
-                <span className="text-base font-extrabold text-white">{formatCurrency(calculatedTotal)}</span>
+                <span className="text-base font-extrabold text-white">{formatCurrency(Math.round(calculatedTotal))}</span>
               </div>
 
               <div>

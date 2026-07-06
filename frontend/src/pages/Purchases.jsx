@@ -229,7 +229,7 @@ const Purchases = () => {
                     <td className="py-4 px-6">
                       <div className="font-bold text-white">{p.invoiceNumber}</div>
                       <div className="flex items-center gap-1 text-xs text-slate-400 mt-1">
-                        <Calendar className="h-3.5 w-3.5 text-blue-400" />
+                        <Calendar className="h-3.5 w-3.5 text-amber-400" />
                         <span>{new Date(p.date).toLocaleDateString('en-IN')}</span>
                       </div>
                     </td>
@@ -411,7 +411,7 @@ const Purchases = () => {
               {/* Total calculation indicator */}
               <div className="flex items-center justify-between rounded-xl bg-slate-950/40 p-4 border border-slate-800/40">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Estimated Total Amount</span>
-                <span className="text-base font-extrabold text-white">{formatCurrency(calculatedTotal)}</span>
+                <span className="text-base font-extrabold text-white">{formatCurrency(Math.round(calculatedTotal))}</span>
               </div>
 
               <div>

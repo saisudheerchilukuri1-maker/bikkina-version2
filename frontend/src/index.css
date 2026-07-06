@@ -134,3 +134,16 @@
     display: block !important;
   }
 }
+
+/* Custom color for native calendar picker calendar icon */
+::-webkit-calendar-picker-indicator {
+  filter: invert(0.75) sepia(1) saturate(6) hue-rotate(15deg) brightness(1.2); /* Neon Amber/Orange tint */
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px;
+  transition: all 0.2s;
+}
+::-webkit-calendar-picker-indicator:hover {
+  background: rgba(255, 255, 255, 0.1);
+  filter: invert(0.9) sepia(1) saturate(12) hue-rotate(15deg) brightness(1.5);
+}

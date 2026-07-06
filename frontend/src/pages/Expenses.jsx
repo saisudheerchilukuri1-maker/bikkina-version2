@@ -179,7 +179,7 @@ const Expenses = () => {
                     </td>
                     <td className="py-4 px-6 whitespace-nowrap text-slate-350">
                       <div className="flex items-center gap-1.5">
-                        <Calendar className="h-4 w-4 text-slate-500" />
+                        <Calendar className="h-4 w-4 text-amber-400" />
                         <span>{new Date(exp.date).toLocaleDateString('en-IN')}</span>
                       </div>
                     </td>
