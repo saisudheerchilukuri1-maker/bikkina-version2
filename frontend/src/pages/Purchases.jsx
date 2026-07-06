@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
-import { Search, Plus, Edit, Trash2, X, Calendar, DollarSign, Archive } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, X, Calendar, DollarSign, Archive, Calculator } from 'lucide-react';
 
 const Purchases = () => {
   const [purchases, setPurchases] = useState([]);
@@ -14,6 +14,27 @@ const Purchases = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('add'); // 'add' or 'edit'
   const [selectedPurchaseId, setSelectedPurchaseId] = useState(null);
+  
+  // Calculator States
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [calcExpression, setCalcExpression] = useState('');
+  const [calcResult, setCalcResult] = useState('');
+
+  const handleCalcClick = (val) => {
+    if (val === 'C') {
+      setCalcExpression('');
+      setCalcResult('');
+    } else if (val === '=') {
+      try {
+        const res = new Function(`return ${calcExpression}`)();
+        setCalcResult(res.toString());
+      } catch (err) {
+        setCalcResult('Error');
+      }
+    } else {
+      setCalcExpression((prev) => prev + val);
+    }
+  };
   
   const [formData, setFormData] = useState({
     invoiceNumber: '',
@@ -147,13 +168,22 @@ const Purchases = () => {
           <h1 className="text-2xl font-bold text-white tracking-wide">Purchase Invoices</h1>
           <p className="text-sm text-slate-400 mt-1">Record incoming stock, purchase transactions, and supplier liabilities.</p>
         </div>
-        <button
-          onClick={handleOpenAddModal}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 hover:opacity-95 active:scale-[0.98] transition-all"
-        >
-          <Plus className="h-5 w-5" />
-          Log Purchase Invoice
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowCalculator(!showCalculator)}
+            className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/40 hover:bg-slate-850 px-4 py-3 text-sm font-semibold text-slate-350 hover:text-white transition-all no-print"
+          >
+            <Calculator className="h-5 w-5 text-indigo-400" />
+            Calculator
+          </button>
+          <button
+            onClick={handleOpenAddModal}
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 hover:opacity-95 active:scale-[0.98] transition-all"
+          >
+            <Plus className="h-5 w-5" />
+            Log Purchase Invoice
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -199,7 +229,7 @@ const Purchases = () => {
                     <td className="py-4 px-6">
                       <div className="font-bold text-white">{p.invoiceNumber}</div>
                       <div className="flex items-center gap-1 text-xs text-slate-400 mt-1">
-                        <Calendar className="h-3.5 w-3.5" />
+                        <Calendar className="h-3.5 w-3.5 text-blue-400" />
                         <span>{new Date(p.date).toLocaleDateString('en-IN')}</span>
                       </div>
                     </td>
@@ -414,6 +444,46 @@ const Purchases = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Calculator Widget */}
+      {showCalculator && (
+        <div className="fixed bottom-6 right-6 z-50 w-72 glass rounded-3xl p-5 shadow-2xl border border-slate-800 animate-scale-up text-white no-print">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-800/80 mb-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-350 flex items-center gap-1.5">
+              <Calculator className="h-4 w-4 text-indigo-400" />
+              Quick Calculator
+            </span>
+            <button onClick={() => setShowCalculator(false)} className="text-slate-400 hover:text-white transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          
+          <div className="bg-slate-950/80 rounded-xl p-3 mb-3 text-right font-mono border border-slate-850">
+            <div className="text-xs text-slate-500 h-4 truncate">{calcExpression || '0'}</div>
+            <div className="text-xl font-bold text-white h-7 truncate mt-1">{calcResult || '0'}</div>
+          </div>
+
+          <div className="grid grid-cols-4 gap-2 text-sm font-semibold">
+            {['7', '8', '9', '/', '4', '5', '6', '*', '1', '2', '3', '-', '0', '.', 'C', '='].map((btn) => (
+              <button
+                key={btn}
+                type="button"
+                onClick={() => handleCalcClick(btn)}
+                className={`h-11 rounded-lg flex items-center justify-center transition-all ${
+                  btn === '='
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-95'
+                    : btn === 'C'
+                    ? 'bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white'
+                    : ['/', '*', '-', '+'].includes(btn)
+                    ? 'bg-slate-800 text-indigo-400 hover:bg-slate-750'
+                    : 'bg-slate-900/60 text-slate-200 hover:bg-slate-800'
+                }`}
+              >
+                {btn}
+              </button>
+            ))}
           </div>
         </div>
       )}
