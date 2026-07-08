@@ -167,11 +167,20 @@ const runTest = async () => {
       salesCompany: salesCompA._id,
       items: saleItems,
       totalAmount: saleTotal,
-      pendingAmount: saleTotal,
+      deduction: 129.0625,
+      pendingAmount: saleTotal - 129.0625,
       date: new Date()
     });
 
-    console.log(`Sale SAL-A1 created successfully. Items count: ${sale.items.length}, Total amount: ${sale.totalAmount}`);
+    console.log(`Sale SAL-A1 created successfully. Items count: ${sale.items.length}, Total amount: ${sale.totalAmount}, Deduction: ${sale.deduction}, Pending: ${sale.pendingAmount}, Status: ${sale.paymentStatus}`);
+
+    if (sale.pendingAmount !== 2000.0) {
+      throw new Error(`Deduction pending calculation failed. Expected: 2000.0, Got: ${sale.pendingAmount}`);
+    }
+    if (sale.paymentStatus !== 'Partially Paid') {
+      throw new Error(`Expected paymentStatus to be 'Partially Paid' due to deduction, got: ${sale.paymentStatus}`);
+    }
+    console.log('Deduction pending amount calculations: PASSED.');
 
     // Verify stock levels are correctly updated in purchases
     const updatedPurA1 = await Purchase.findById(purA1._id);

@@ -68,6 +68,11 @@ const saleSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    deduction: {
+      type: Number,
+      default: 0,
+      min: [0, 'Deduction cannot be negative'],
+    },
     pendingAmount: {
       type: Number,
       required: true,
@@ -92,7 +97,7 @@ const saleSchema = new mongoose.Schema(
   }
 );
 
-// Pre-validate hook to calculate total and pendingAmount
+// Pre-validate hook to calculate total, pendingAmount, and status
 saleSchema.pre('validate', function (next) {
   if (this.items && this.items.length > 0) {
     let total = 0;
@@ -105,8 +110,14 @@ saleSchema.pre('validate', function (next) {
     this.totalAmount = this.quantity * this.rate;
   }
   
-  if (this.isNew) {
-    this.pendingAmount = this.totalAmount - this.receivedAmount;
+  this.pendingAmount = this.totalAmount - this.receivedAmount - (this.deduction || 0);
+
+  if (this.receivedAmount === 0 && (this.deduction || 0) === 0) {
+    this.paymentStatus = 'Pending';
+  } else if (this.receivedAmount + (this.deduction || 0) >= this.totalAmount) {
+    this.paymentStatus = 'Paid';
+  } else {
+    this.paymentStatus = 'Partially Paid';
   }
   
   next();

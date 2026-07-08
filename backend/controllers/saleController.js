@@ -21,7 +21,7 @@ export const getSales = async (req, res, next) => {
 // @route   POST /api/sales
 // @access  Private
 export const createSale = async (req, res, next) => {
-  const { invoiceNumber, salesCompany, items, date, notes } = req.body;
+  const { invoiceNumber, salesCompany, items, deduction, date, notes } = req.body;
 
   try {
     // Check if invoice number is unique for this user
@@ -91,13 +91,16 @@ export const createSale = async (req, res, next) => {
       await purchase.save();
     }
 
+    const saleDeduction = Number(deduction) || 0;
+
     const sale = new Sale({
       user: req.user._id,
       invoiceNumber,
       salesCompany,
       items: processedItems,
       totalAmount,
-      pendingAmount: totalAmount,
+      deduction: saleDeduction,
+      pendingAmount: totalAmount - saleDeduction,
       date,
       notes,
     });
@@ -106,7 +109,7 @@ export const createSale = async (req, res, next) => {
 
     // Update Sales Company totals
     company.totals.salesAmount += totalAmount;
-    company.totals.pendingAmount += totalAmount;
+    company.totals.pendingAmount += (totalAmount - saleDeduction);
     await company.save();
 
     res.status(201).json(savedSale);
@@ -140,7 +143,7 @@ const restoreOldStock = async (sale, userId) => {
 // @route   PUT /api/sales/:id
 // @access  Private
 export const updateSale = async (req, res, next) => {
-  const { items, date, notes } = req.body;
+  const { items, deduction, date, notes } = req.body;
 
   try {
     const sale = await Sale.findOne({ _id: req.params.id, user: req.user._id });
@@ -241,17 +244,19 @@ export const updateSale = async (req, res, next) => {
     }
 
     const oldTotal = sale.totalAmount;
+    const oldDeduction = sale.deduction || 0;
     sale.date = date || sale.date;
     sale.notes = notes ?? sale.notes;
+    sale.deduction = deduction !== undefined ? Number(deduction) : sale.deduction;
 
     // Recalculate totals
     sale.totalAmount = totalAmount;
-    sale.pendingAmount = sale.totalAmount - sale.receivedAmount;
+    sale.pendingAmount = sale.totalAmount - sale.receivedAmount - sale.deduction;
 
     // Update payment status
-    if (sale.receivedAmount === 0) {
+    if (sale.receivedAmount === 0 && sale.deduction === 0) {
       sale.paymentStatus = 'Pending';
-    } else if (sale.receivedAmount >= sale.totalAmount) {
+    } else if (sale.receivedAmount + sale.deduction >= sale.totalAmount) {
       sale.paymentStatus = 'Paid';
     } else {
       sale.paymentStatus = 'Partially Paid';
@@ -261,8 +266,9 @@ export const updateSale = async (req, res, next) => {
 
     // Update sales company totals with delta
     const amountDelta = updatedSale.totalAmount - oldTotal;
+    const deductionDelta = updatedSale.deduction - oldDeduction;
     company.totals.salesAmount += amountDelta;
-    company.totals.pendingAmount += amountDelta;
+    company.totals.pendingAmount += (amountDelta - deductionDelta);
     await company.save();
 
     res.json(updatedSale);
@@ -305,7 +311,7 @@ export const deleteSale = async (req, res, next) => {
     const company = await SalesCompany.findOne({ _id: sale.salesCompany, user: req.user._id });
     if (company) {
       company.totals.salesAmount -= sale.totalAmount;
-      company.totals.pendingAmount -= sale.totalAmount;
+      company.totals.pendingAmount -= (sale.totalAmount - (sale.deduction || 0));
       company.totals.receivedAmount -= sale.receivedAmount;
       await company.save();
     }

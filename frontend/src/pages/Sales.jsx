@@ -41,6 +41,7 @@ const Sales = () => {
     invoiceNumber: '',
     salesCompany: '',
     items: [{ purchaseInvoice: '', productName: '', quantity: '', rate: '' }],
+    deduction: '',
     date: new Date().toISOString().split('T')[0],
     notes: '',
   });
@@ -122,6 +123,7 @@ const Sales = () => {
       invoiceNumber: '',
       salesCompany: '',
       items: [{ purchaseInvoice: '', productName: '', quantity: '', rate: '' }],
+      deduction: '',
       date: new Date().toISOString().split('T')[0],
       notes: '',
     });
@@ -151,6 +153,7 @@ const Sales = () => {
             },
           ],
       date: s.date ? new Date(s.date).toISOString().split('T')[0] : '',
+      deduction: s.deduction || '',
       notes: s.notes || '',
     });
     setError('');
@@ -208,6 +211,7 @@ const Sales = () => {
 
     const submitData = {
       ...formData,
+      deduction: Number(formData.deduction) || 0,
       items: formData.items.map((item) => ({
         ...item,
         quantity: Number(item.quantity),
@@ -354,9 +358,14 @@ const Sales = () => {
                       )}
                     </td>
                     <td className="py-4 px-6 text-right">
-                      <div className="font-bold text-white">{formatCurrency(s.totalAmount)}</div>
-                      <div className="text-[10px] text-slate-400 font-medium mt-0.5">
-                        {s.items && s.items.length > 0 ? `${s.items.length} item(s)` : `Rate: ${formatCurrency(s.rate)}`}
+                      <div className="font-bold text-white">{formatCurrency(s.totalAmount - (s.deduction || 0))}</div>
+                      {s.deduction > 0 && (
+                        <div className="text-[10px] text-red-405 font-medium mt-0.5">
+                          Loss: -{formatCurrency(s.deduction)}
+                        </div>
+                      )}
+                      <div className="text-[10px] text-slate-500 font-medium mt-0.5">
+                        Gross: {formatCurrency(s.totalAmount)}
                       </div>
                     </td>
                     <td className="py-4 px-6 text-center">
@@ -571,10 +580,40 @@ const Sales = () => {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                  Loss / Shortage Deduction (₹)
+                </label>
+                <input
+                  type="number"
+                  name="deduction"
+                  min="0"
+                  step="any"
+                  value={formData.deduction}
+                  onChange={handleInputChange}
+                  placeholder="e.g. 500 (discount or weight shortage loss)"
+                  className="w-full rounded-xl border border-slate-800 bg-slate-900/60 py-3 px-4 text-sm text-white placeholder-slate-500 outline-none focus:border-green-500 transition-all"
+                />
+              </div>
+
               {/* Total calculations */}
-              <div className="flex items-center justify-between rounded-xl bg-slate-950/40 p-4 border border-slate-800/40">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Gross Sales Value</span>
-                <span className="text-base font-extrabold text-white">{formatCurrency(Math.round(calculatedTotal))}</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between rounded-xl bg-slate-950/40 p-4 border border-slate-800/40">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Gross Sales Value</span>
+                  <span className="text-base font-extrabold text-white">{formatCurrency(Math.round(calculatedTotal))}</span>
+                </div>
+                {Number(formData.deduction) > 0 && (
+                  <div className="flex items-center justify-between rounded-xl bg-red-950/20 p-4 border border-red-900/20 text-red-400 animate-scale-up">
+                    <span className="text-xs font-bold uppercase tracking-wider">Shortage Loss/Deduction</span>
+                    <span className="text-base font-extrabold">- {formatCurrency(Number(formData.deduction))}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between rounded-xl bg-slate-950/60 p-4 border border-slate-800/60">
+                  <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Net Receivable Value</span>
+                  <span className="text-base font-extrabold text-indigo-400">
+                    {formatCurrency(Math.round(calculatedTotal - (Number(formData.deduction) || 0)))}
+                  </span>
+                </div>
               </div>
 
               <div>

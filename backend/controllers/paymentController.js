@@ -146,10 +146,10 @@ export const createPayment = async (req, res, next) => {
         const allocateAmount = Math.min(remainingToAllocate, invoice.pendingAmount);
         if (allocateAmount > 0) {
           invoice.receivedAmount += allocateAmount;
-          invoice.pendingAmount = invoice.totalAmount - invoice.receivedAmount;
+          invoice.pendingAmount = invoice.totalAmount - invoice.receivedAmount - (invoice.deduction || 0);
 
-          if (invoice.receivedAmount === 0) invoice.paymentStatus = 'Pending';
-          else if (invoice.receivedAmount >= invoice.totalAmount) invoice.paymentStatus = 'Paid';
+          if (invoice.receivedAmount === 0 && (invoice.deduction || 0) === 0) invoice.paymentStatus = 'Pending';
+          else if (invoice.receivedAmount + (invoice.deduction || 0) >= invoice.totalAmount) invoice.paymentStatus = 'Paid';
           else invoice.paymentStatus = 'Partially Paid';
 
           await invoice.save();
@@ -179,10 +179,10 @@ export const createPayment = async (req, res, next) => {
           const allocateAmount = Math.min(remainingToAllocate, invoice.pendingAmount);
           if (allocateAmount > 0) {
             invoice.receivedAmount += allocateAmount;
-            invoice.pendingAmount = invoice.totalAmount - invoice.receivedAmount;
+            invoice.pendingAmount = invoice.totalAmount - invoice.receivedAmount - (invoice.deduction || 0);
 
-            if (invoice.receivedAmount === 0) invoice.paymentStatus = 'Pending';
-            else if (invoice.receivedAmount >= invoice.totalAmount) invoice.paymentStatus = 'Paid';
+            if (invoice.receivedAmount === 0 && (invoice.deduction || 0) === 0) invoice.paymentStatus = 'Pending';
+            else if (invoice.receivedAmount + (invoice.deduction || 0) >= invoice.totalAmount) invoice.paymentStatus = 'Paid';
             else invoice.paymentStatus = 'Partially Paid';
 
             await invoice.save();

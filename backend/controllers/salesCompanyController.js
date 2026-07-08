@@ -123,16 +123,16 @@ export const getSalesCompanyLedger = async (req, res, next) => {
 
     // Map sales
     sales.forEach((s) => {
-      const description = s.items && s.items.length > 0
+      const description = `${s.items && s.items.length > 0
         ? `Sale - ${s.items.map(item => `${item.productName} (${item.quantity} x ${item.rate})`).join(', ')}`
-        : `Sale - ${s.productName} (${s.quantity} x ${s.rate})`;
+        : `Sale - ${s.productName} (${s.quantity} x ${s.rate})`}${s.deduction > 0 ? ` [Loss: ₹${s.deduction}]` : ''}`;
       transactions.push({
         _id: s._id,
         date: s.date,
         type: 'Sale',
         invoiceNumber: s.invoiceNumber,
         description,
-        debit: s.totalAmount,
+        debit: s.totalAmount - (s.deduction || 0),
         credit: 0,
         remarks: s.notes || '',
         attachment: '',
