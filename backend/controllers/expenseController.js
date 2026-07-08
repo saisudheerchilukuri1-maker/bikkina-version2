@@ -5,7 +5,10 @@ import Expense from '../models/Expense.js';
 // @access  Private
 export const getExpenses = async (req, res, next) => {
   try {
-    const expenses = await Expense.find({ user: req.user._id }).sort({ date: -1 });
+    const expenses = await Expense.find({ user: req.user._id })
+      .populate('purchaseCompany', 'name')
+      .populate('salesCompany', 'name')
+      .sort({ date: -1 });
     res.json(expenses);
   } catch (error) {
     next(error);
@@ -16,11 +19,14 @@ export const getExpenses = async (req, res, next) => {
 // @route   POST /api/expenses
 // @access  Private
 export const createExpense = async (req, res, next) => {
-  const { title, amount, category, date, notes } = req.body;
+  const { companyType, purchaseCompany, salesCompany, title, amount, category, date, notes } = req.body;
 
   try {
     const expense = await Expense.create({
       user: req.user._id,
+      companyType,
+      purchaseCompany: companyType === 'PurchaseCompany' ? purchaseCompany : undefined,
+      salesCompany: companyType === 'SalesCompany' ? salesCompany : undefined,
       title,
       amount: Number(amount),
       category,

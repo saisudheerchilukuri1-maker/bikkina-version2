@@ -1,6 +1,7 @@
 import PurchaseCompany from '../models/PurchaseCompany.js';
 import Purchase from '../models/Purchase.js';
 import Payment from '../models/Payment.js';
+import Expense from '../models/Expense.js';
 
 // @desc    Get all purchase companies
 // @route   GET /api/purchase-companies
@@ -114,6 +115,9 @@ export const getPurchaseCompanyLedger = async (req, res, next) => {
     // Fetch all payments to this company
     const payments = await Payment.find({ purchaseCompany: company._id, user: req.user._id }).sort({ paymentDate: 1 });
 
+    // Fetch all expenses linked to this purchase company
+    const expenses = await Expense.find({ purchaseCompany: company._id, user: req.user._id }).sort({ date: 1 });
+
     // Combine transactions
     const transactions = [];
 
@@ -147,6 +151,21 @@ export const getPurchaseCompanyLedger = async (req, res, next) => {
       });
     });
 
+    // Map expenses
+    expenses.forEach((e) => {
+      transactions.push({
+        _id: e._id,
+        date: e.date,
+        type: 'Expense',
+        invoiceNumber: e.category || 'Expense',
+        description: `Expense - ${e.title}`,
+        debit: 0,
+        credit: e.amount,
+        remarks: e.notes || '',
+        attachment: '',
+      });
+    });
+
     // Sort by date ascending
     transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
 
@@ -168,13 +187,15 @@ export const getPurchaseCompanyLedger = async (req, res, next) => {
       remainingQuantity: purchases.reduce((acc, p) => acc + p.remainingQuantity, 0),
     };
 
+    const totalExpenses = expenses.reduce((acc, e) => acc + e.amount, 0);
+
     res.json({
       company,
       ledger,
       totals: {
         totalPurchase: company.totals.purchaseAmount,
         totalPaid: company.totals.paidAmount,
-        outstandingBalance: company.totals.pendingAmount,
+        outstandingBalance: company.totals.pendingAmount + totalExpenses,
         remainingQuantity: stockStats.remainingQuantity,
         soldQuantity: stockStats.soldQuantity,
         quantityPurchased: stockStats.quantityPurchased,

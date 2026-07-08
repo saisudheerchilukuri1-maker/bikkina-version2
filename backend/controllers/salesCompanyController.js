@@ -1,6 +1,7 @@
 import SalesCompany from '../models/SalesCompany.js';
 import Sale from '../models/Sale.js';
 import Payment from '../models/Payment.js';
+import Expense from '../models/Expense.js';
 
 // @desc    Get all sales companies
 // @route   GET /api/sales-companies
@@ -114,6 +115,9 @@ export const getSalesCompanyLedger = async (req, res, next) => {
     // Fetch all payments from this company
     const payments = await Payment.find({ salesCompany: company._id, user: req.user._id }).sort({ paymentDate: 1 });
 
+    // Fetch all expenses linked to this sales company
+    const expenses = await Expense.find({ salesCompany: company._id, user: req.user._id }).sort({ date: 1 });
+
     // Combine transactions
     const transactions = [];
 
@@ -150,6 +154,21 @@ export const getSalesCompanyLedger = async (req, res, next) => {
       });
     });
 
+    // Map expenses
+    expenses.forEach((e) => {
+      transactions.push({
+        _id: e._id,
+        date: e.date,
+        type: 'Expense',
+        invoiceNumber: e.category || 'Expense',
+        description: `Expense - ${e.title}`,
+        debit: e.amount,
+        credit: 0,
+        remarks: e.notes || '',
+        attachment: '',
+      });
+    });
+
     // Sort by date ascending
     transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
 
@@ -163,13 +182,15 @@ export const getSalesCompanyLedger = async (req, res, next) => {
       };
     });
 
+    const totalExpenses = expenses.reduce((acc, e) => acc + e.amount, 0);
+
     res.json({
       company,
       ledger,
       totals: {
         totalSales: company.totals.salesAmount,
         totalReceived: company.totals.receivedAmount,
-        outstandingBalance: company.totals.pendingAmount,
+        outstandingBalance: company.totals.pendingAmount + totalExpenses,
       },
     });
   } catch (error) {

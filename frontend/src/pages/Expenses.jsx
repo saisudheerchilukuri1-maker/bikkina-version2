@@ -12,12 +12,18 @@ const Expenses = () => {
   // Modal states
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
+    companyType: 'PurchaseCompany',
+    purchaseCompany: '',
+    salesCompany: '',
     title: '',
     amount: '',
-    category: 'Rent',
+    category: 'Logistics / Transport',
     date: new Date().toISOString().split('T')[0],
     notes: '',
   });
+
+  const [purchaseCompanies, setPurchaseCompanies] = useState([]);
+  const [salesCompanies, setSalesCompanies] = useState([]);
 
   const categories = [
     'Rent',
@@ -42,8 +48,20 @@ const Expenses = () => {
     setLoading(false);
   };
 
+  const fetchCompanies = async () => {
+    try {
+      const suppliers = await api.get('/api/purchase-companies');
+      setPurchaseCompanies(suppliers.data);
+      const customers = await api.get('/api/sales-companies');
+      setSalesCompanies(customers.data);
+    } catch (err) {
+      console.error('Error fetching companies list:', err);
+    }
+  };
+
   useEffect(() => {
     fetchExpenses();
+    fetchCompanies();
   }, []);
 
   useEffect(() => {
@@ -61,9 +79,12 @@ const Expenses = () => {
 
   const handleOpenAddModal = () => {
     setFormData({
+      companyType: 'PurchaseCompany',
+      purchaseCompany: '',
+      salesCompany: '',
       title: '',
       amount: '',
-      category: 'Rent',
+      category: 'Logistics / Transport',
       date: new Date().toISOString().split('T')[0],
       notes: '',
     });
@@ -171,7 +192,14 @@ const Expenses = () => {
               <tbody className="divide-y divide-slate-800/40 text-sm">
                 {filteredExpenses.map((exp) => (
                   <tr key={exp._id} className="hover:bg-slate-900/20 transition-colors">
-                    <td className="py-4 px-6 font-bold text-white">{exp.title}</td>
+                    <td className="py-4 px-6">
+                      <div className="font-bold text-white">{exp.title}</div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-400 mt-1">
+                        {exp.companyType === 'PurchaseCompany'
+                          ? `Supplier: ${exp.purchaseCompany?.name || 'Unknown'}`
+                          : `Customer: ${exp.salesCompany?.name || 'Unknown'}`}
+                      </div>
+                    </td>
                     <td className="py-4 px-6">
                       <span className="inline-flex rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-300">
                         {exp.category}
@@ -229,6 +257,73 @@ const Expenses = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                  Company Type <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
+                    <input
+                      type="radio"
+                      name="companyType"
+                      value="PurchaseCompany"
+                      checked={formData.companyType === 'PurchaseCompany'}
+                      onChange={handleInputChange}
+                      className="accent-red-500"
+                    />
+                    Supplier (Purchase)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-white cursor-pointer">
+                    <input
+                      type="radio"
+                      name="companyType"
+                      value="SalesCompany"
+                      checked={formData.companyType === 'SalesCompany'}
+                      onChange={handleInputChange}
+                      className="accent-red-500"
+                    />
+                    Customer (Sales)
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">
+                  Select Associated Company <span className="text-red-500">*</span>
+                </label>
+                {formData.companyType === 'PurchaseCompany' ? (
+                  <select
+                    name="purchaseCompany"
+                    required
+                    value={formData.purchaseCompany}
+                    onChange={handleInputChange}
+                    className="w-full rounded-xl border border-slate-800 bg-slate-900/60 py-3 px-4 text-sm text-white outline-none focus:border-red-500 transition-all"
+                  >
+                    <option value="">Select Supplier</option>
+                    {purchaseCompanies.map((c) => (
+                      <option key={c._id} value={c._id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    name="salesCompany"
+                    required
+                    value={formData.salesCompany}
+                    onChange={handleInputChange}
+                    className="w-full rounded-xl border border-slate-800 bg-slate-900/60 py-3 px-4 text-sm text-white outline-none focus:border-red-500 transition-all"
+                  >
+                    <option value="">Select Customer</option>
+                    {salesCompanies.map((c) => (
+                      <option key={c._id} value={c._id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1.5">
                   Expense Title <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -237,7 +332,7 @@ const Expenses = () => {
                   required
                   value={formData.title}
                   onChange={handleInputChange}
-                  placeholder="e.g. Rent for warehouse B"
+                  placeholder="e.g. Loading and Transport Charges"
                   className="w-full rounded-xl border border-slate-800 bg-slate-900/60 py-3 px-4 text-sm text-white placeholder-slate-500 outline-none focus:border-red-500 transition-all"
                 />
               </div>

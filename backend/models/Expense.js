@@ -7,6 +7,25 @@ const expenseSchema = new mongoose.Schema(
       ref: 'User',
       required: true,
     },
+    companyType: {
+      type: String,
+      required: [true, 'Company type is required'],
+      enum: ['PurchaseCompany', 'SalesCompany'],
+    },
+    purchaseCompany: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'PurchaseCompany',
+      required: function () {
+        return this.companyType === 'PurchaseCompany';
+      },
+    },
+    salesCompany: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'SalesCompany',
+      required: function () {
+        return this.companyType === 'SalesCompany';
+      },
+    },
     title: {
       type: String,
       required: [true, 'Expense title is required'],
