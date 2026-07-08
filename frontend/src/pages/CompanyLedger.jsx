@@ -62,7 +62,7 @@ const CompanyLedger = () => {
       'Remarks',
     ];
 
-    const rows = ledgerData.ledger.map((item) => [
+    const rows = [...ledgerData.ledger].reverse().map((item) => [
       new Date(item.date).toLocaleDateString('en-IN'),
       item.type,
       item.invoiceNumber,
@@ -278,7 +278,7 @@ const CompanyLedger = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 print:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 print:grid-cols-3">
         <div className="glass rounded-2xl p-5 print:border print:border-slate-300 print:text-black">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
             {type === 'purchase' ? 'Total Purchased' : 'Total Sales'}
@@ -305,18 +305,6 @@ const CompanyLedger = () => {
             {formatCurrency(totals.outstandingBalance)}
           </h3>
         </div>
-
-        {type === 'purchase' && (
-          <div className="glass rounded-2xl p-5 print:border print:border-slate-300 print:text-black">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Stock In Hand (Rods/Bags)
-            </span>
-            <h3 className="text-xl font-bold mt-1 text-indigo-400 print:text-black">
-              {totals.remainingQuantity} <span className="text-xs font-normal text-slate-400">rem.</span>
-              <span className="text-xs font-normal text-slate-500 ml-1.5">/ {totals.quantityPurchased} purchased</span>
-            </h3>
-          </div>
-        )}
       </div>
 
       {/* Ledger statement table */}
@@ -326,7 +314,7 @@ const CompanyLedger = () => {
             <TrendingDown className="h-5 w-5 text-indigo-400" />
             <h3 className="font-bold text-white">Chronological Transaction Log</h3>
           </div>
-          <span className="text-xs text-slate-400">Sorted oldest to newest (FIFO running balance)</span>
+          <span className="text-xs text-slate-400">Sorted newest to oldest</span>
         </div>
 
         {ledger.length === 0 ? (
@@ -349,7 +337,7 @@ const CompanyLedger = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/40 text-sm print:divide-slate-300">
-                {ledger.map((item) => (
+                {[...ledger].reverse().map((item) => (
                   <tr key={item._id} className="hover:bg-slate-900/10 transition-colors hover:print:bg-transparent">
                     <td className="py-4 px-5 whitespace-nowrap text-slate-300 print:text-black">
                       {new Date(item.date).toLocaleDateString('en-IN', {
