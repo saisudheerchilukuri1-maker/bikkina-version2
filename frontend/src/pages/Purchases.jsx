@@ -240,7 +240,7 @@ const Purchases = () => {
                       <div className="font-semibold text-slate-200">{p.productName}</div>
                       <div className="flex items-center gap-1.5 text-xs text-indigo-400 font-semibold mt-1">
                         <Archive className="h-3.5 w-3.5 shrink-0" />
-                        <span>Stock Rem: {p.remainingQuantity} / {p.quantity}</span>
+                        <span>Stock Rem: {Math.round(p.remainingQuantity)} / {Math.round(p.quantity)}</span>
                       </div>
                     </td>
                     <td className="py-4 px-6 text-right">

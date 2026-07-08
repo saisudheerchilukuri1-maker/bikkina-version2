@@ -517,7 +517,7 @@ const Sales = () => {
                             .filter((p) => p.remainingQuantity > 0 || item.purchaseInvoice === p._id)
                             .map((p) => (
                               <option key={p._id} value={p._id}>
-                                {p.invoiceNumber} - {p.productName} ({p.remainingQuantity} units left)
+                                {p.invoiceNumber} - {p.productName} ({Math.round(p.remainingQuantity)} units left)
                               </option>
                             ))}
                         </select>
@@ -527,7 +527,7 @@ const Sales = () => {
                         <div className="flex justify-between items-center text-[10px] text-indigo-300">
                           <span>Product: <strong>{item.productName}</strong></span>
                           {purchases.find(p => p._id === item.purchaseInvoice) && (
-                            <span>Rem Stock: <strong>{purchases.find(p => p._id === item.purchaseInvoice).remainingQuantity} units</strong></span>
+                            <span>Rem Stock: <strong>{Math.round(purchases.find(p => p._id === item.purchaseInvoice).remainingQuantity)} units</strong></span>
                           )}
                         </div>
                       )}

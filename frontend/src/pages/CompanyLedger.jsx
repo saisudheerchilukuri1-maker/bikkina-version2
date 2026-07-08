@@ -214,8 +214,13 @@ const CompanyLedger = () => {
 
       {/* Printable header info */}
       <div className="hidden print-only text-center mb-6">
-        <h1 className="text-2xl font-bold text-black uppercase tracking-wider">Account Ledger</h1>
-        <p className="text-sm text-slate-700">Company wise chronological transactions statement</p>
+        <h1 className="text-3xl font-extrabold text-black uppercase tracking-widest print-bikkina-highlight">
+          BIKKINA TRADES
+        </h1>
+        <div className="text-xs font-bold text-slate-800 uppercase tracking-widest mt-1">
+          Account Ledger Statement
+        </div>
+        <div className="h-[2px] bg-black my-3 w-40 mx-auto"></div>
       </div>
 
       {/* Company details Section */}
@@ -330,7 +335,7 @@ const CompanyLedger = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse print:text-black">
+            <table className="w-full text-left border-collapse print:text-black print-ledger-table">
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-900/20 text-xs font-semibold uppercase tracking-wider text-slate-400 print:text-slate-800 print:border-black">
                   <th className="py-4 px-5">Date</th>
